@@ -172,7 +172,8 @@ bool NetworkEvents::disable()
 	if (threadRunning)
 	{
 		zmq_close(responder);
-		zmq_ctx_destroy(zmqcontext); // this will cause the thread to exit
+		zmq_term(zmqcontext); // this will cause the thread to exit
+		//zmq_ctx_destroy(zmqcontext); // this will cause the thread to exit
 
 		if (!shutdown)
 			zmqcontext = getProcessorGraph()->createZmqContext();// and this will take care that processor graph doesn't attempt to delete the context again
