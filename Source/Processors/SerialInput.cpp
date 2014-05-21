@@ -105,6 +105,13 @@ void SerialInput::process(AudioSampleBuffer&, MidiBuffer& events, int&)
         unsigned char buffer[10000];
         int bytesRead = serial.readBytes(buffer, bytesAvailable);
         
+#ifdef DEBUG
+		char buf[10000];
+		memcpy(buf, buffer, bytesRead);
+		buf[bytesRead] = '\0';
+		std::cerr << std::string(buf) << std::endl;
+		OutputDebugString(std::string(buf).c_str());
+#endif
         if (bytesRead > 0)
         {
             addEvent(events,    // MidiBuffer
