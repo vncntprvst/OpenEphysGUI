@@ -58,6 +58,7 @@ ProcessorList::ProcessorList()
     sources->addSubItem(new ProcessorListItem("File Reader"));
 	//sources->addSubItem(new ProcessorListItem("Network Events"));
     sources->addSubItem(new ProcessorListItem("Serial Port"));
+	sources->addSubItem(new ProcessorListItem("UnoSpeak"));
     //sources->addSubItem(new ProcessorListItem("Event Generator"));
 
     ProcessorListItem* filters = new ProcessorListItem("Filters");
@@ -72,14 +73,14 @@ ProcessorList::ProcessorList()
 
     ProcessorListItem* sinks = new ProcessorListItem("Sinks");
     sinks->addSubItem(new ProcessorListItem("LFP Viewer"));
-    //sinks->addSubItem(new ProcessorListItem("LFP Trig. Avg."));
+    sinks->addSubItem(new ProcessorListItem("LFP Trig. Avg."));
     sinks->addSubItem(new ProcessorListItem("Spike Viewer"));
-	//sinks->addSubItem(new ProcessorListItem("PSTH"));
-	//sinks->addSubItem(new ProcessorListItem("Network Sink"));
-    //sinks->addSubItem(new ProcessorListItem("WiFi Output"));
-    //sinks->addSubItem(new ProcessorListItem("Arduino Output"));
-    // sinks->addSubItem(new ProcessorListItem("FPGA Output"));
-    sinks->addSubItem(new ProcessorListItem("Pulse Pal"));
+	sinks->addSubItem(new ProcessorListItem("PSTH"));
+	sinks->addSubItem(new ProcessorListItem("Network Sink"));
+    sinks->addSubItem(new ProcessorListItem("WiFi Output"));
+    sinks->addSubItem(new ProcessorListItem("Arduino Output"));
+    sinks->addSubItem(new ProcessorListItem("FPGA Output"));
+    //sinks->addSubItem(new ProcessorListItem("Pulse Pal"));
 
     ProcessorListItem* utilities = new ProcessorListItem("Utilities");
     utilities->addSubItem(new ProcessorListItem("Splitter"));

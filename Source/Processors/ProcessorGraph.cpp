@@ -44,6 +44,7 @@
 #include "WiFiOutput.h"
 #include "FileReader.h"
 #include "ArduinoOutput.h"
+#include "UnoSpeak.h"
 #include "FPGAOutput.h"
 #include "PulsePalOutput.h"
 #include "SerialInput.h"
@@ -615,6 +616,11 @@ GenericProcessor* ProcessorGraph::createProcessorFromDescription(String& descrip
             std::cout << "Creating an Arduino node." << std::endl;
             processor = new ArduinoOutput();
         }
+		else if (subProcessorType.equalsIgnoreCase("UnoSpeak"))
+		{
+			std::cout << "Listening to and displaying Arduino serial input" << std::endl;
+			processor = new UnoSpeak();
+		}
         else if (subProcessorType.equalsIgnoreCase("FPGA Output"))
         {
             std::cout << "Creating an FPGA output node." << std::endl;
