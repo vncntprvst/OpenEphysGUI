@@ -23,10 +23,10 @@
 
 #include "GenericEditor.h"
 
-#include "ParameterEditor.h"
+#include "../Parameter/ParameterEditor.h"
 #include "ChannelSelector.h"
-#include "../ProcessorGraph.h"
-#include "../RecordNode.h"
+#include "../ProcessorGraph/ProcessorGraph.h"
+#include "../RecordNode/RecordNode.h"
 #include "../../UI/ProcessorList.h"
 
 #include "../../UI/EditorViewport.h"
@@ -35,12 +35,12 @@
 
 #ifndef M_PI
 #define M_PI 3.14159265359
-#endif 
+#endif
 GenericEditor::GenericEditor(GenericProcessor* owner, bool useDefaultParameterEditors=true)
     : AudioProcessorEditor(owner),
       desiredWidth(150), isFading(false), accumulator(0.0), acquisitionIsActive(false),
-      drawerButton(0), channelSelector(0),drawerWidth(170),
-      isSelected(false),  isEnabled(true), isCollapsed(false), tNum(-1), drawerOpen(false)
+      drawerButton(0), drawerWidth(170),
+    drawerOpen(false), channelSelector(0), isSelected(false), isEnabled(true), isCollapsed(false), tNum(-1)
 {
     constructorInitialize(owner, useDefaultParameterEditors);
 }
@@ -76,7 +76,7 @@ void GenericEditor::constructorInitialize(GenericProcessor* owner, bool useDefau
 
     if (!owner->isMerger() && !owner->isSplitter() && !owner->isUtility())
     {
-       // std::cout << "Adding drawer button." << std::endl;
+        // std::cout << "Adding drawer button." << std::endl;
 
         drawerButton = new DrawerButton("name");
         drawerButton->addListener(this);
@@ -141,7 +141,7 @@ void GenericEditor::addParameterEditors(bool useDefaultParameterEditors=true)
         int maxX = 15;
         int maxY = 30;
 
-       // std::cout << "Adding parameter editors." << std::endl;
+        // std::cout << "Adding parameter editors." << std::endl;
 
         for (int i = 0; i < getProcessor()->getNumParameters(); i++)
         {
@@ -280,6 +280,18 @@ void GenericEditor::setEnabledState(bool t)
     isEnabled = p->enabledState();
 }
 
+void GenericEditor::startRecording()
+{
+	if (channelSelector != 0)
+		channelSelector->inactivateRecButtons();
+}
+
+void GenericEditor::stopRecording()
+{
+	if (channelSelector != 0)
+		channelSelector->activateRecButtons();
+}
+
 void GenericEditor::startAcquisition()
 {
 
@@ -360,12 +372,14 @@ void GenericEditor::paint(Graphics& g)
     // draw title
     if (!isCollapsed)
     {
-       // if (!getProcessor()->isMerger() && !getProcessor()->isSplitter())
-      //      g.drawText(name+" ("+String(nodeId)+")", 6, 5, 500, 15, Justification::left, false);
-       // else
-            g.drawText(displayName, 6, 5, 500, 15, Justification::left, false);
+        // if (!getProcessor()->isMerger() && !getProcessor()->isSplitter())
+        //      g.drawText(name+" ("+String(nodeId)+")", 6, 5, 500, 15, Justification::left, false);
+        // else
+        g.drawText(displayName, 6, 5, 500, 15, Justification::left, false);
 
-    } else {
+    }
+    else
+    {
         g.addTransform(AffineTransform::rotation(-M_PI/2.0));
         g.drawText(displayName, -getHeight()+6, 5, 500, 15, Justification::left, false);
         g.addTransform(AffineTransform::rotation(M_PI/2.0));
@@ -411,7 +425,7 @@ void GenericEditor::timerCallback()
 void GenericEditor::buttonClicked(Button* button)
 {
 
-   // std::cout << "Button clicked." << std::endl;
+    // std::cout << "Button clicked." << std::endl;
 
     checkDrawerButton(button);
 
@@ -470,7 +484,7 @@ void GenericEditor::update()
 
     GenericProcessor* p = (GenericProcessor*) getProcessor();
 
-   // std::cout << p->getName() << " updating settings." << std::endl;
+    // std::cout << p->getName() << " updating settings." << std::endl;
 
     int numChannels;
 
@@ -485,7 +499,7 @@ void GenericEditor::update()
 
         for (int i = 0; i < numChannels; i++)
         {
-           // std::cout << p->channels[i]->getRecordState() << std::endl;
+            // std::cout << p->channels[i]->getRecordState() << std::endl;
             channelSelector->setRecordStatus(i, p->channels[i]->getRecordState());
         }
     }
@@ -618,7 +632,9 @@ void GenericEditor::switchCollapsedState()
             desiredWidth = originalWidth;
             isCollapsed = false;
 
-        } else {
+        }
+        else
+        {
             originalWidth = desiredWidth;
             desiredWidth = 25;
             isCollapsed = true;
@@ -670,9 +686,9 @@ void GenericEditor::loadEditorParameters(XmlElement* xml)
 
 GenericEditor* GenericEditor::getSourceEditor()
 {
-    
+
     GenericProcessor* sourceNode = getProcessor()->getSourceNode();
-    
+
     if (sourceNode != nullptr)
         return sourceNode->getEditor();
     else
@@ -682,7 +698,7 @@ GenericEditor* GenericEditor::getSourceEditor()
 GenericEditor* GenericEditor::getDestEditor()
 {
     GenericProcessor* destNode = getProcessor()->getDestNode();
-    
+
     if (destNode != nullptr)
         return destNode->getEditor();
     else
@@ -920,7 +936,7 @@ void UtilityButton::resized()
 
 String UtilityButton::getLabel()
 {
-	return label;
+    return label;
 }
 
 void UtilityButton::setLabel(String label_)
@@ -957,13 +973,13 @@ void TriangleButton::paintButton(Graphics& g, bool isMouseOver, bool isButtonDow
     x2 = getWidth()/2;
     x3 = getWidth()-inset;
 
-    if (direction == 1)
+    if (direction == 1) // up
     {
         y1 = getHeight()-inset;
         y2 = inset;
 
     }
-    else
+    else if (direction == 2) // down
     {
         y1 = inset;
         y2 = getHeight()-inset;
@@ -975,6 +991,49 @@ void TriangleButton::paintButton(Graphics& g, bool isMouseOver, bool isButtonDow
 
 
 }
+
+LoadButton::LoadButton() : ImageButton("Load")
+{
+
+    Image icon = ImageCache::getFromMemory(BinaryData::upload2_png,
+                                           BinaryData::upload2_pngSize);
+
+    setImages(false, // resizeButtonNowToFitThisImage 
+              true,  // rescaleImagesWhenButtonSizeChanges
+              true,  // preserveImageProprotions
+              icon,  // normalImage
+              1.0,   // imageOpacityWhenNormal
+              Colours::white, // overlayColourWhenNormal
+              icon,  // overImage
+              1.0,   // imageOpacityWhenOver
+              Colours::yellow, // overlayColourWhenOver
+              icon,  // downImage
+              1.0,   // imageOpacityWhenDown
+              Colours::yellow // overlayColourWhenDown
+              );
+
+}
+
+SaveButton::SaveButton() : ImageButton("Save")
+{
+    Image icon = ImageCache::getFromMemory(BinaryData::floppy5_png,
+                                           BinaryData::floppy5_pngSize);
+
+   setImages(false, // resizeButtonNowToFitThisImage 
+          true,  // rescaleImagesWhenButtonSizeChanges
+          true,  // preserveImageProprotions
+          icon,  // normalImage
+          1.0,   // imageOpacityWhenNormal
+          Colours::white, // overlayColourWhenNormal
+          icon,  // overImage
+          1.0,   // imageOpacityWhenOver
+          Colours::yellow, // overlayColourWhenOver
+          icon,  // downImage
+          1.0,   // imageOpacityWhenDown
+          Colours::yellow // overlayColourWhenDown
+          );
+}
+
 
 void GenericEditor::updateParameterButtons(int parameterIndex)
 {

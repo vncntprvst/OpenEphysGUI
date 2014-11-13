@@ -2,7 +2,7 @@
     ------------------------------------------------------------------
 
     This file is part of the Open Ephys GUI
-    Copyright (C) 2013 Open Ephys
+    Copyright (C) 2014 Open Ephys
 
     ------------------------------------------------------------------
 
@@ -26,9 +26,10 @@
 
 #include "../../JuceLibraryCode/JuceHeader.h"
 #include "../Audio/AudioComponent.h"
-#include "../Processors/Editors/AudioEditor.h"
-#include "../Processors/ProcessorGraph.h"
-#include "../Processors/RecordNode.h"
+#include "../Processors/AudioNode/AudioEditor.h"
+#include "../Processors/ProcessorGraph/ProcessorGraph.h"
+#include "../Processors/RecordNode/RecordNode.h"
+#include "../Processors/RecordNode/RecordEngine.h"
 #include "CustomLookAndFeel.h"
 #include "../AccessClass.h"
 #include "../Processors/Editors/GenericEditor.h" // for UtilityButton
@@ -163,8 +164,6 @@ private:
   The Clock uses built-in JUCE functions for getting the system time. It does not
   currently interact with timestamps from ProcessorGraph sources.
 
-  The Clock draws the time using OpenGL (and the FTGL font library).
-
   @see ControlPanel
 
 */
@@ -239,8 +238,8 @@ public:
 
     /** Sets the open/closed state of the ControlPanelButton.*/
     void setState(bool);
-    
-   
+
+
 
     /** Draws the button. */
     void paint(Graphics& g);
@@ -253,7 +252,7 @@ private:
     ControlPanel* cp;
 
     bool open;
-    
+
 
 };
 
@@ -277,7 +276,8 @@ class ControlPanel : public Component,
     public Button::Listener,
     public Timer,
     public AccessClass,
-    public Label::Listener
+    public Label::Listener,
+    public ComboBox::Listener
 
 {
 public:
@@ -326,12 +326,12 @@ public:
 
     /** Load settings. */
     void loadStateFromXml(XmlElement*);
-    
-	void handleIncomdingMessages();
 
-		/** Informs the Control Panel that recording has begun.*/
+    void handleIncomdingMessages();
+
+    /** Informs the Control Panel that recording has begun.*/
     void startRecording();
-    
+
     /** Informs the Control Panel that recording has stopped.*/
     void stopRecording();
 
@@ -341,16 +341,18 @@ public:
     /** Sets the list of recently used directories for saving data. */
     void setRecentlyUsedFilenames(const StringArray& filenames);
 
-	ScopedPointer<RecordButton> recordButton;
+    ScopedPointer<RecordButton> recordButton;
 private:
     ScopedPointer<PlayButton> playButton;
-    
+
     ScopedPointer<Clock> masterClock;
     ScopedPointer<CPUMeter> cpuMeter;
     ScopedPointer<DiskSpaceMeter> diskMeter;
     ScopedPointer<FilenameComponent> filenameComponent;
     ScopedPointer<UtilityButton> newDirectoryButton;
     ScopedPointer<ControlPanelButton> cpb;
+
+    ScopedPointer<ComboBox> recordSelector;
 
     ScopedPointer<Label> prependText;
     ScopedPointer<Label> dateText;
@@ -365,6 +367,8 @@ private:
     void resized();
 
     void buttonClicked(Button* button);
+
+    void comboBoxChanged(ComboBox* combo);
 
     bool initialize;
 
@@ -388,8 +392,12 @@ private:
 
     /** Draws the boundaries around the FilenameComponent.*/
     void createPaths();
-    
+
     Colour backgroundColour;
+
+    OwnedArray<RecordEngineManager> recordEngines;
+    ScopedPointer<UtilityButton> recordOptionsButton;
+    int lastEngineIndex;
 
 };
 

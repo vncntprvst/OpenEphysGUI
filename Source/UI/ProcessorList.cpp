@@ -2,7 +2,7 @@
     ------------------------------------------------------------------
 
     This file is part of the Open Ephys GUI
-    Copyright (C) 2013 Open Ephys
+    Copyright (C) 2014 Open Ephys
 
     ------------------------------------------------------------------
 
@@ -55,27 +55,33 @@ ProcessorList::ProcessorList()
     //sources->addSubItem(new ProcessorListItem("Signal Generator"));
     //sources->addSubItem(new ProcessorListItem("Custom FPGA"));
     sources->addSubItem(new ProcessorListItem("Rhythm FPGA"));
+#if JUCE_WINDOWS // eCube module currently only available for Windows
+#ifdef ECUBE_COMPILE
+    sources->addSubItem(new ProcessorListItem("eCube")); // Added by Michael Borisov
+#endif
+#endif
     sources->addSubItem(new ProcessorListItem("File Reader"));
-	//sources->addSubItem(new ProcessorListItem("Network Events"));
+    //sources->addSubItem(new ProcessorListItem("Network Events"));
     sources->addSubItem(new ProcessorListItem("Serial Port"));
     //sources->addSubItem(new ProcessorListItem("Event Generator"));
 
     ProcessorListItem* filters = new ProcessorListItem("Filters");
     filters->addSubItem(new ProcessorListItem("Bandpass Filter"));
     filters->addSubItem(new ProcessorListItem("Spike Detector"));
+    filters->addSubItem(new ProcessorListItem("Spike Sorter"));
     //filters->addSubItem(new ProcessorListItem("Resampler"));
     filters->addSubItem(new ProcessorListItem("Phase Detector"));
     //filters->addSubItem(new ProcessorListItem("Digital Ref"));
     filters->addSubItem(new ProcessorListItem("Channel Map"));
-	//filters->addSubItem(new ProcessorListItem("Eye Tracking"));
+    //filters->addSubItem(new ProcessorListItem("Eye Tracking"));
 
 
     ProcessorListItem* sinks = new ProcessorListItem("Sinks");
     sinks->addSubItem(new ProcessorListItem("LFP Viewer"));
     //sinks->addSubItem(new ProcessorListItem("LFP Trig. Avg."));
     sinks->addSubItem(new ProcessorListItem("Spike Viewer"));
-	//sinks->addSubItem(new ProcessorListItem("PSTH"));
-	//sinks->addSubItem(new ProcessorListItem("Network Sink"));
+    //sinks->addSubItem(new ProcessorListItem("PSTH"));
+    //sinks->addSubItem(new ProcessorListItem("Network Sink"));
     //sinks->addSubItem(new ProcessorListItem("WiFi Output"));
     //sinks->addSubItem(new ProcessorListItem("Arduino Output"));
     // sinks->addSubItem(new ProcessorListItem("FPGA Output"));
@@ -461,7 +467,7 @@ void ProcessorList::mouseDown(const MouseEvent& e)
             else
             {
                 getUIComponent()->childComponentChanged();
-               // totalHeight = itemHeight + 2*yBuffer;
+                // totalHeight = itemHeight + 2*yBuffer;
             }
 
         }
@@ -506,7 +512,7 @@ void ProcessorList::mouseDrag(const MouseEvent& e)
                 if (dragDescription.isNotEmpty())
                 {
                     DragAndDropContainer* const dragContainer
-                    = DragAndDropContainer::findParentDragContainerFor(this);
+                        = DragAndDropContainer::findParentDragContainerFor(this);
 
                     if (dragContainer != 0)
                     {
@@ -563,7 +569,7 @@ void ProcessorList::saveStateToXml(XmlElement* xml)
                 break;
             default:
                 // do nothing
-            ;
+                ;
         }
 
         Colour c = findColour(id);
@@ -584,11 +590,11 @@ void ProcessorList::loadStateFromXml(XmlElement* xml)
         {
             forEachXmlChildElement(*xmlNode, colorNode)
             {
-                setColour(colorNode->getIntAttribute("ID"), 
+                setColour(colorNode->getIntAttribute("ID"),
                           Colour(
-                            colorNode->getIntAttribute("R"),
-                            colorNode->getIntAttribute("G"),
-                            colorNode->getIntAttribute("B")));
+                              colorNode->getIntAttribute("R"),
+                              colorNode->getIntAttribute("G"),
+                              colorNode->getIntAttribute("B")));
             }
         }
     }
@@ -607,7 +613,7 @@ Array<Colour> ProcessorList::getColours()
     c.add(findColour(FILTER_COLOR));
     c.add(findColour(SINK_COLOR));
     c.add(findColour(UTILITY_COLOR));
-	return c;
+    return c;
 }
 
 void ProcessorList::setColours(Array<Colour> c)
@@ -636,7 +642,7 @@ void ProcessorList::setColours(Array<Colour> c)
         }
     }
 
-    
+
 }
 
 // ===================================================================

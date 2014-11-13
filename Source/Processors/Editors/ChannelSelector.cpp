@@ -24,16 +24,15 @@
 #include "ChannelSelector.h"
 #include <math.h>
 
-#include "../RecordNode.h"
-#include "../AudioNode.h"
-#include "../ProcessorGraph.h"
+#include "../RecordNode/RecordNode.h"
+#include "../AudioNode/AudioNode.h"
+#include "../ProcessorGraph/ProcessorGraph.h"
 #include "../../UI/GraphViewer.h"
 
 ChannelSelector::ChannelSelector(bool createButtons, Font& titleFont_) :
     eventsOnly(false), paramsToggled(true), paramsActive(true),
-    radioStatus(false), isNotSink(createButtons), moveRight(false),
-    moveLeft(false), offsetLR(0), offsetUD(0), desiredOffset(0),
-    titleFont(titleFont_), acquisitionIsActive(false)
+    recActive(true), radioStatus(false), isNotSink(createButtons),
+    moveRight(false), moveLeft(false), offsetLR(0), offsetUD(0), desiredOffset(0), titleFont(titleFont_), acquisitionIsActive(false)
 {
 
     // initialize buttons
@@ -53,7 +52,7 @@ ChannelSelector::ChannelSelector(bool createButtons, Font& titleFont_) :
     paramsButton->addListener(this);
     addAndMakeVisible(paramsButton);
 
-    paramsButton->setToggleState(true, false);
+    paramsButton->setToggleState(true, dontSendNotification);
 
     audioButtons.clear();
     recordButtons.clear();
@@ -113,7 +112,7 @@ void ChannelSelector::setNumChannels(int numChans)
 
     int difference = numChans - parameterButtons.size();
 
-   // std::cout << difference << " buttons needed." << std::endl;
+    // std::cout << difference << " buttons needed." << std::endl;
 
     if (difference > 0)
     {
@@ -127,6 +126,18 @@ void ChannelSelector::setNumChannels(int numChans)
         for (int n = 0; n < -difference; n++)
         {
             removeButton();
+        }
+    }
+
+    //Reassign numbers according to the actual channels (useful for channel mapper)
+    for (int n = 0; n < parameterButtons.size(); n++)
+    {
+        int num = ((GenericEditor*)getParentComponent())->getChannel(n)->num + 1;
+        parameterButtons[n]->setChannel(num);
+        if (isNotSink)
+        {
+            recordButtons[n]->setChannel(num);
+            audioButtons[n]->setChannel(num);
         }
     }
 
@@ -237,9 +248,9 @@ void ChannelSelector::addButton()
     channelSelectorRegion->addAndMakeVisible(b);
 
     if (paramsToggled)
-        b->setToggleState(true, false);
+        b->setToggleState(true, dontSendNotification);
     else
-        b->setToggleState(false, false);
+        b->setToggleState(false, dontSendNotification);
 
     if (!paramsActive)
         b->setActive(false);
@@ -307,12 +318,12 @@ void ChannelSelector::setActiveChannels(Array<int> a)
 
     for (int i = 0; i < parameterButtons.size(); i++)
     {
-        parameterButtons[i]->setToggleState(false,false);
+        parameterButtons[i]->setToggleState(false, dontSendNotification);
     }
 
     for (int i = 0; i < a.size(); i++)
     {
-        parameterButtons[a[i]]->setToggleState(true,false);
+        parameterButtons[a[i]]->setToggleState(true, dontSendNotification);
     }
 }
 
@@ -341,6 +352,31 @@ void ChannelSelector::activateButtons()
 
 }
 
+void ChannelSelector::inactivateRecButtons()
+{
+
+    recActive = false;
+
+    for (int i = 0; i < recordButtons.size(); i++)
+    {
+        recordButtons[i]->setActive(false);
+        recordButtons[i]->repaint();
+    }
+}
+
+void ChannelSelector::activateRecButtons()
+{
+
+    recActive = true;
+
+    for (int i = 0; i < recordButtons.size(); i++)
+    {
+        recordButtons[i]->setActive(true);
+        recordButtons[i]->repaint();
+    }
+
+}
+
 void ChannelSelector::startAcquisition()
 {
     acquisitionIsActive = true;
@@ -363,12 +399,12 @@ void ChannelSelector::setRadioStatus(bool radioOn)
         {
             if (radioOn)
             {
-                parameterButtons[i]->setToggleState(false, false);
+                parameterButtons[i]->setToggleState(false, dontSendNotification);
                 parameterButtons[i]->setRadioGroupId(999);
             }
             else
             {
-                parameterButtons[i]->setToggleState(false, false);
+                parameterButtons[i]->setToggleState(false, dontSendNotification);
                 parameterButtons[i]->setRadioGroupId(0);
             }
         }
@@ -413,7 +449,7 @@ void ChannelSelector::setParamStatus(int chan, bool b)
 {
 
     if (chan >= 0 && chan < parameterButtons.size())
-        parameterButtons[chan]->setToggleState(b, true);
+        parameterButtons[chan]->setToggleState(b, sendNotification);
 
 }
 
@@ -421,7 +457,7 @@ void ChannelSelector::setRecordStatus(int chan, bool b)
 {
 
     if (chan >= 0 && chan < recordButtons.size())
-        recordButtons[chan]->setToggleState(b, true);
+        recordButtons[chan]->setToggleState(b, sendNotification);
 
 }
 
@@ -429,14 +465,14 @@ void ChannelSelector::setAudioStatus(int chan, bool b)
 {
 
     if (chan >= 0 && chan < audioButtons.size())
-        audioButtons[chan]->setToggleState(b, true);
+        audioButtons[chan]->setToggleState(b, sendNotification);
 
 }
 
 void ChannelSelector::clearAudio()
 {
     for (int chan = 0; chan < audioButtons.size(); chan++)
-        audioButtons[chan]->setToggleState(false, true);
+        audioButtons[chan]->setToggleState(false, sendNotification);
 }
 
 int ChannelSelector::getDesiredWidth()
@@ -468,7 +504,7 @@ void ChannelSelector::buttonClicked(Button* button)
         }
         else
         {
-            paramsButton->setToggleState(true, false);
+            paramsButton->setToggleState(true, dontSendNotification);
         }
         return;
     }
@@ -483,7 +519,7 @@ void ChannelSelector::buttonClicked(Button* button)
         }
         else
         {
-            paramsButton->setToggleState(true, false);
+            paramsButton->setToggleState(true, dontSendNotification);
         }
         return;
     }
@@ -496,7 +532,7 @@ void ChannelSelector::buttonClicked(Button* button)
 
             for (int i = 0; i < recordButtons.size(); i++)
             {
-                recordButtons[i]->setToggleState(true, true);
+                recordButtons[i]->setToggleState(true, sendNotification);
             }
 
         }
@@ -506,7 +542,7 @@ void ChannelSelector::buttonClicked(Button* button)
 
             for (int i = 0; i < parameterButtons.size(); i++)
             {
-                parameterButtons[i]->setToggleState(true, true);
+                parameterButtons[i]->setToggleState(true, sendNotification);
             }
         }
         else if (offsetLR == audioOffset)
@@ -521,21 +557,21 @@ void ChannelSelector::buttonClicked(Button* button)
         {
             for (int i = 0; i < recordButtons.size(); i++)
             {
-                recordButtons[i]->setToggleState(false, true);
+                recordButtons[i]->setToggleState(false, sendNotification);
             }
         }
         else if (offsetLR == parameterOffset)
         {
             for (int i = 0; i < parameterButtons.size(); i++)
             {
-                parameterButtons[i]->setToggleState(false, true);
+                parameterButtons[i]->setToggleState(false, sendNotification);
             }
         }
         else if (offsetLR == audioOffset)
         {
             for (int i = 0; i < audioButtons.size(); i++)
             {
-                audioButtons[i]->setToggleState(false, true);
+                audioButtons[i]->setToggleState(false, sendNotification);
             }
         }
 
@@ -565,7 +601,7 @@ void ChannelSelector::buttonClicked(Button* button)
             if (acquisitionIsActive) // use setParameter to change parameter safely
             {
                 editor->getProcessorGraph()->
-                    getAudioNode()->setChannelStatus(ch, status);
+                getAudioNode()->setChannelStatus(ch, status);
             }
             else     // change parameter directly
             {
@@ -587,7 +623,7 @@ void ChannelSelector::buttonClicked(Button* button)
             {
                 editor->getProcessorGraph()->
                 getRecordNode()->
-                    setChannelStatus(ch, status);
+                setChannelStatus(ch, status);
             }
             else     // change parameter directly
             {
@@ -844,7 +880,7 @@ void ChannelSelectorRegion::mouseWheelMove(const MouseEvent& event,
                                            const MouseWheelDetails& wheel)
 {
 
-   // std::cout << "Got wheel move: " << wheel.deltaY << std::endl;
+    // std::cout << "Got wheel move: " << wheel.deltaY << std::endl;
     channelSelector->shiftChannelsVertical(-wheel.deltaY);
 }
 

@@ -2,7 +2,7 @@
     ------------------------------------------------------------------
 
     This file is part of the Open Ephys GUI
-    Copyright (C) 2013 Open Ephys
+    Copyright (C) 2014 Open Ephys
 
     ------------------------------------------------------------------
 
@@ -29,7 +29,11 @@ UIComponent::UIComponent(MainWindow* mainWindow_, ProcessorGraph* pgraph, AudioC
 
 {
 
-    processorGraph->setUIComponent(this);
+    processorGraph->createDefaultNodes();
+
+    messageCenterEditor = (MessageCenterEditor*) processorGraph->getMessageCenter()->createEditor();
+    addActionListener(messageCenterEditor);
+    addAndMakeVisible(messageCenterEditor);
 
     infoLabel = new InfoLabel();
     std::cout << "Created info label." << std::endl;
@@ -66,22 +70,18 @@ UIComponent::UIComponent(MainWindow* mainWindow_, ProcessorGraph* pgraph, AudioC
     processorList->setBounds(0,0,195,processorList->getTotalHeight());
     std::cout << "Created filter list." << std::endl;
 
-    messageCenter = new MessageCenter();
-    addActionListener(messageCenter);
-    addAndMakeVisible(messageCenter);
-
     std::cout << "Created message center." << std::endl;
 
     setBounds(0,0,500,400);
 
-    processorGraph->setUIComponent(this);
-    
+
+    processorGraph->setUIComponent(this); // update pointers
     processorList->setUIComponent(this);
     editorViewport->setUIComponent(this);
     dataViewport->setUIComponent(this);
     controlPanel->getAudioEditor()->setUIComponent(this);
     controlPanel->setUIComponent(this);
-    
+
     processorGraph->updatePointers(); // needs to happen after processorGraph gets the right pointers
 
 #if JUCE_MAC
@@ -131,7 +131,7 @@ void UIComponent::resized()
 
         editorViewport->setBounds(6,h-190,w-11,150);
 
-        
+
     }
 
     if (controlPanel != 0)
@@ -141,10 +141,12 @@ void UIComponent::resized()
         int addHeight = 0;
         int leftBound;
 
-        if (w >= 460){
+        if (w >= 460)
+        {
             leftBound = 202;
         }
-        else {
+        else
+        {
             leftBound = w-258;
             controlPanelWidth = w-leftBound;
         }
@@ -183,10 +185,11 @@ void UIComponent::resized()
             processorListViewport.setScrollBarsShown(true,false);
 
         }
-        else{
+        else
+        {
             processorListViewport.setBounds(5,5,195,34);
             processorListViewport.setScrollBarsShown(false,false);
-            processorListViewport.setViewPosition (0, 0);
+            processorListViewport.setViewPosition(0, 0);
         }
 
         if (w < 460)
@@ -215,22 +218,22 @@ void UIComponent::resized()
 
         dataViewport->setBounds(left, top, width, height);
 
-         if (h < 200)
+        if (h < 200)
             dataViewport->setVisible(false);
         else
             dataViewport->setVisible(true);
 
     }
 
-    
 
-    if (messageCenter != 0)
+
+    if (messageCenterEditor != 0)
     {
-        messageCenter->setBounds(6,h-35,w-241,30);
+        messageCenterEditor->setBounds(6,h-35,w-241,30);
         if (h < 200)
-            messageCenter->setBounds(6,h-35+200-h,w-241,30);
-      //  else
-      //      messageCenter->setVisible(true);
+            messageCenterEditor->setBounds(6,h-35+200-h,w-241,30);
+        //  else
+        //      messageCenter->setVisible(true);
     }
 
     // for debugging purposes:
@@ -239,7 +242,7 @@ void UIComponent::resized()
         dataViewport->setVisible(false);
         editorViewport->setVisible(false);
         processorList->setVisible(false);
-        messageCenter->setVisible(false);
+        messageCenterEditor->setVisible(false);
         controlPanel->setVisible(false);
         editorViewportButton->setVisible(false);
     }
@@ -446,7 +449,7 @@ void UIComponent::getCommandInfo(CommandID commandID, ApplicationCommandInfo& re
             result.setInfo("Show help...", "Take me to the GUI wiki.", "General", 0);
             result.setActive(true);
             break;
-            
+
         case resizeWindow:
             result.setInfo("Reset window bounds", "Reset window bounds", "General", 0);
             break;
@@ -487,7 +490,9 @@ bool UIComponent::perform(const InvocationInfo& info)
                 if (currentConfigFile.exists())
                 {
                     sendActionMessage(getEditorViewport()->saveState(currentConfigFile));
-                } else {
+                }
+                else
+                {
                     FileChooser fc("Choose the file name...",
                                    File::getCurrentWorkingDirectory(),
                                    "*",
@@ -538,17 +543,17 @@ bool UIComponent::perform(const InvocationInfo& info)
             break;
 
         case clearSignalChain:
-        {
-            getEditorViewport()->clearSignalChain();
-            break;
-        }
+            {
+                getEditorViewport()->clearSignalChain();
+                break;
+            }
 
         case showHelp:
-        {
-            URL url = URL("https://open-ephys.atlassian.net/wiki/display/OEW/Open+Ephys+GUI");
-            url.launchInDefaultBrowser();
-            break;
-        }
+            {
+                URL url = URL("https://open-ephys.atlassian.net/wiki/display/OEW/Open+Ephys+GUI");
+                url.launchInDefaultBrowser();
+                break;
+            }
 
         case toggleProcessorList:
             processorList->toggleState();
@@ -561,7 +566,7 @@ bool UIComponent::perform(const InvocationInfo& info)
         case toggleSignalChain:
             editorViewportButton->toggleState();
             break;
-            
+
         case resizeWindow:
             mainWindow->centreWithSize(800, 600);
             break;

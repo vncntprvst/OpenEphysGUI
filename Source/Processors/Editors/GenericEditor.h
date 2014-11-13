@@ -25,10 +25,10 @@
 #define __GENERICEDITOR_H_DD406E71__
 
 #include "../../../JuceLibraryCode/JuceHeader.h"
-#include "../GenericProcessor.h"
+#include "../GenericProcessor/GenericProcessor.h"
 #include "../../AccessClass.h"
 
-#include "../Channel.h"
+#include "../Channel/Channel.h"
 
 #include <stdio.h>
 
@@ -86,7 +86,7 @@ public:
 
     /** Highlights an editor.*/
     void highlight();
-    
+
     /** Makes an editor visible if it's not already.*/
     void makeVisible();
 
@@ -107,6 +107,12 @@ public:
 
     /** Used to enable or disable an editor's processor.*/
     void setEnabledState(bool);
+
+	/** Called at the start of a recording **/
+	void startRecording();
+
+	/** Called at the end of a recording **/
+	void stopRecording();
 
     /** Called just prior to the start of acquisition, to allow the editor to prepare.*/
     virtual void startAcquisition();
@@ -170,21 +176,24 @@ public:
 
     /** Required for SplitterEditor only.*/
     virtual void switchDest() { }
-    
+
 
     /** Required for SplitterEditor and MergerEditor only.*/
     virtual void switchIO(int) { }
-    
+
     /** Required for SplitterEditor and MergerEditor only.*/
-    virtual int getPathForEditor(GenericEditor* editor) { return -1;}
-    
+    virtual int getPathForEditor(GenericEditor* editor)
+    {
+        return -1;
+    }
+
     /** Used by GraphViewer */
     bool isSplitter();
-    
+
     /** Used by GraphViewer */
     bool isMerger();
-    
-    
+
+
 
     /** Handles button clicks for all editors. Deals with clicks on the editor's
         title bar and channel selector drawer. */
@@ -221,6 +230,16 @@ public:
 
     /** Called when an editor's processor updates its settings (mainly to update channel count).*/
     virtual void update();
+
+    /** Allows other UI elements to use background color of editor. */
+    Colour getBackgroundColor() {
+        return backgroundColor;
+    }
+
+    /** Allows other elements to use background gradient of editor. */
+    ColourGradient getBackgroundGradient() {
+        return backgroundGradient;
+    }
 
     /** Called by the update() method to allow the editor to update its custom settings.*/
     virtual void updateSettings() {}
@@ -276,21 +295,25 @@ public:
     /**  Collapses an editor if it's open, and opens it if it's collpased*/
     void switchCollapsedState();
 
-     /**  Notifies the editor that the collapsed state changed, for non-standard function. */
+    /**  Notifies the editor that the collapsed state changed, for non-standard function. */
     virtual void collapsedStateChanged() {}
 
     /** Returns the editor of this processor's source */
     GenericEditor* getSourceEditor();
-    
+
     /** Returns the editor of this processor's destination */
     GenericEditor* getDestEditor();
 
     /** Returns the editors a splitter or merger is connected to */
-	virtual Array<GenericEditor*> getConnectedEditors(){ Array<GenericEditor*> a; return a;}
+    virtual Array<GenericEditor*> getConnectedEditors()
+    {
+        Array<GenericEditor*> a;
+        return a;
+    }
 
     /** Returns an array of record statuses for all channels. Used by GraphNode */
     Array<bool> getRecordStatusArray();
-    
+
 protected:
 
     /** A pointer to the button that opens the drawer for the ChannelSelector. */
@@ -331,7 +354,7 @@ private:
     bool isEnabled;
     bool isCollapsed;
 
-    /**Used to determine if an editor is a splitter or Merger to avoid calling on CHannelSelector*/
+    /**Used to determine if an editor is a splitter or Merger to avoid calling on ChannelSelector*/
     bool isSplitOrMerge;
 
     int tNum;
@@ -393,6 +416,37 @@ private:
 
 /**
 
+  A button that displays a "load" icon.
+
+  @see GenericEditor
+
+*/
+
+class LoadButton : public ImageButton
+{
+public:
+    LoadButton();
+    ~LoadButton() {}
+};
+
+/**
+
+  A button that displays a "save" icon.
+
+  @see GenericEditor
+
+*/
+
+class SaveButton : public ImageButton
+{
+public:
+    SaveButton();
+    ~SaveButton() {}
+private:
+};
+
+/**
+
   A button that displays text.
 
   @see GenericEditor
@@ -415,7 +469,7 @@ public:
     }
 
     void setLabel(String label);
-	String getLabel();
+    String getLabel();
 
 private:
     void paintButton(Graphics& g, bool isMouseOver, bool isButtonDown);

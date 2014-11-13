@@ -1,23 +1,23 @@
 /*
-    ------------------------------------------------------------------
+------------------------------------------------------------------
 
-    This file is part of the Open Ephys GUI
-    Copyright (C) 2013 Open Ephys
+This file is part of the Open Ephys GUI
+Copyright (C) 2014 Open Ephys
 
-    ------------------------------------------------------------------
+------------------------------------------------------------------
 
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 */
 
@@ -25,6 +25,7 @@
 #include "UIComponent.h"
 #include <stdio.h>
 #include <math.h>
+#include "../Processors/RecordNode/RecordEngine.h"
 
 PlayButton::PlayButton()
     : DrawableButton("PlayButton", DrawableButton::ImageFitted)
@@ -97,7 +98,7 @@ CPUMeter::CPUMeter() : Label("CPU Meter","0.0"), cpu(0.0f), lastCpu(0.0f)
     // Typeface::Ptr typeface = new CustomTypeface(mis);
     // font = Font(typeface);
     // font.setHeight(12);
-    
+
     setTooltip("CPU usage");
 }
 
@@ -137,7 +138,7 @@ DiskSpaceMeter::DiskSpaceMeter()
     // Typeface::Ptr typeface = new CustomTypeface(mis);
     // font = Font(typeface);
     // font.setHeight(12);
-    
+
     setTooltip("Disk space available");
 }
 
@@ -193,10 +194,12 @@ void Clock::paint(Graphics& g)
     if (isRecording)
     {
         g.fillAll(Colour(255,0,0));
-    } else {
+    }
+    else
+    {
         g.fillAll(Colour(58,58,58));
     }
-    
+
     drawTime(g);
 }
 
@@ -361,7 +364,7 @@ void ControlPanelButton::setState(bool b)
 
 
 ControlPanel::ControlPanel(ProcessorGraph* graph_, AudioComponent* audio_)
-    : graph(graph_), audio(audio_), initialize(true), open(false)
+    : graph(graph_), audio(audio_), initialize(true), open(false), lastEngineIndex(-1)
 {
 
     if (1)
@@ -398,6 +401,22 @@ ControlPanel::ControlPanel(ProcessorGraph* graph_, AudioComponent* audio_)
     cpb = new ControlPanelButton(this);
     addAndMakeVisible(cpb);
 
+    recordSelector = new ComboBox();
+    recordSelector->addListener(this);
+    for (int i =0; i < RecordEngineManager::getNumOfBuiltInEngines(); i++)
+    {
+        RecordEngineManager* rem = RecordEngineManager::createBuiltInEngineManager(i);
+        recordSelector->addItem(rem->getName(),i+1);
+        recordEngines.add(rem);
+    }
+    addChildComponent(recordSelector);
+
+    recordOptionsButton = new UtilityButton("R",Font("Small Text", 15, Font::plain));
+    recordOptionsButton->setEnabledState(true);
+    recordOptionsButton->addListener(this);
+    recordOptionsButton->setTooltip("Configure options for selected record engine");
+    addChildComponent(recordOptionsButton);
+
     newDirectoryButton = new UtilityButton("+", Font("Small Text", 15, Font::plain));
     newDirectoryButton->setEnabledState(false);
     newDirectoryButton->addListener(this);
@@ -406,10 +425,10 @@ ControlPanel::ControlPanel(ProcessorGraph* graph_, AudioComponent* audio_)
 
 
     File executable = File::getSpecialLocation(File::currentExecutableFile);
-    
+
 #if defined(__APPLE__)
     const String executableDirectory =
-    executable.getParentDirectory().getParentDirectory().getParentDirectory().getParentDirectory().getFullPathName();
+        executable.getParentDirectory().getParentDirectory().getParentDirectory().getParentDirectory().getFullPathName();
 #else
     const String executableDirectory = executable.getParentDirectory().getFullPathName();
 #endif
@@ -450,7 +469,7 @@ ControlPanel::ControlPanel(ProcessorGraph* graph_, AudioComponent* audio_)
     startTimer(10);
 
     setWantsKeyboardFocus(true);
-    
+
     backgroundColour = Colour(58,58,58);
 
 }
@@ -465,7 +484,7 @@ void ControlPanel::setRecordState(bool t)
 
     //MessageManager* mm = MessageManager::getInstance();
 
-    recordButton->setToggleState(t, true);
+    recordButton->setToggleState(t, sendNotification);
 
 }
 
@@ -474,14 +493,19 @@ void ControlPanel::updateChildComponents()
 
     filenameComponent->addListener(getProcessorGraph()->getRecordNode());
     getProcessorGraph()->getRecordNode()->filenameComponentChanged(filenameComponent);
+    recordSelector->setSelectedId(1,sendNotificationSync);
 
 }
 
 void ControlPanel::createPaths()
 {
-    int w = getWidth() - 325;
+    /*  int w = getWidth() - 325;
     if (w > 150)
-        w = 150;
+    w = 150;*/
+
+    int w = getWidth() - 435;
+    if (w > 22)
+        w = 22;
 
     int h1 = getHeight()-32;
     int h2 = getHeight();
@@ -527,9 +551,11 @@ void ControlPanel::resized()
     if (playButton != 0)
     {
         if (w > 330)
-            playButton->setBounds(w-h*10,5,h-5,h-10);\
+            playButton->setBounds(w-h*10,5,h-5,h-10);
+        \
         else
-            playButton->setBounds(5,5,h-5,h-10);\
+            playButton->setBounds(5,5,h-5,h-10);
+        \
     }
 
     if (recordButton != 0)
@@ -582,12 +608,12 @@ void ControlPanel::resized()
     {
         if (getWidth() < 750 && getWidth() >= 570)
             audioEditor->setBounds(w-526,0,h*8,h);
-       else if (getWidth() < 570)
+        else if (getWidth() < 570)
             audioEditor->setBounds(8,0+offset2,h*8,h);
         else
             audioEditor->setBounds(h*7,0,h*8,h);
     }
-        
+
 
     if (cpb != 0)
     {
@@ -602,6 +628,12 @@ void ControlPanel::resized()
     if (open)
     {
         int topBound = getHeight()-h+10-5;
+
+        recordSelector->setBounds((w - 435) > 40 ? 35 : w-450, topBound, 100, h-10);
+        recordSelector->setVisible(true);
+
+        recordOptionsButton->setBounds((w - 435) > 40 ? 140 : w-350,topBound, h-10, h-10);
+        recordOptionsButton->setVisible(true);
 
         filenameComponent->setBounds(165, topBound, w-500, h-10);
         filenameComponent->setVisible(true);
@@ -626,6 +658,8 @@ void ControlPanel::resized()
         prependText->setVisible(false);
         dateText->setVisible(false);
         appendText->setVisible(false);
+        recordSelector->setVisible(false);
+        recordOptionsButton->setVisible(false);
     }
 
     repaint();
@@ -660,7 +694,7 @@ void ControlPanel::startRecording()
     appendText->setEditable(false);
     dateText->setColour(Label::textColourId, Colours::black);
 
-    graph->setRecordState(true); 
+    graph->setRecordState(true);
 
     repaint();
 }
@@ -676,7 +710,7 @@ void ControlPanel::stopRecording()
     prependText->setEditable(true);
     appendText->setEditable(true);
 
-    recordButton->setToggleState(false,false);
+    recordButton->setToggleState(false, dontSendNotification);
 
     repaint();
 }
@@ -684,7 +718,7 @@ void ControlPanel::stopRecording()
 void ControlPanel::buttonClicked(Button* button)
 
 {
-    
+
     if (button == newDirectoryButton && newDirectoryButton->getEnabledState())
     {
         graph->getRecordNode()->newDirectoryNeeded = true;
@@ -704,15 +738,22 @@ void ControlPanel::buttonClicked(Button* button)
 
             if (graph->enableProcessors()) // start the processor graph
             {
+                if (recordEngines[recordSelector->getSelectedId()-1]->isWindowOpen())
+                    recordEngines[recordSelector->getSelectedId()-1]->toggleConfigWindow();
+
                 audio->beginCallbacks();
                 masterClock->start();
                 audioEditor->disable();
-                
+
                 stopTimer();
                 startTimer(250); // refresh every 250 ms
 
             }
-        } else {
+            recordSelector->setEnabled(false);
+            recordOptionsButton->setEnabled(false);
+        }
+        else
+        {
 
             if (recordButton->getToggleState())
             {
@@ -726,7 +767,9 @@ void ControlPanel::buttonClicked(Button* button)
             stopTimer();
             startTimer(60000); // back to refresh every minute
             audioEditor->enable();
-            
+            recordSelector->setEnabled(true);
+            recordOptionsButton->setEnabled(true);
+
         }
 
         return;
@@ -739,27 +782,75 @@ void ControlPanel::buttonClicked(Button* button)
             if (playButton->getToggleState())
             {
                 startRecording();
-            } else {
+            }
+            else
+            {
                 if (graph->enableProcessors()) // start the processor graph
                 {
+                    if (recordEngines[recordSelector->getSelectedId()-1]->isWindowOpen())
+                        recordEngines[recordSelector->getSelectedId()-1]->toggleConfigWindow();
+
                     audio->beginCallbacks();
                     masterClock->start();
                     audioEditor->disable();
-                    
+
                     stopTimer();
                     startTimer(250); // refresh every 250 ms
 
                     startRecording();
 
-                    playButton->setToggleState(true,false);
+                    playButton->setToggleState(true, dontSendNotification);
+                    recordSelector->setEnabled(false);
+                    recordOptionsButton->setEnabled(false);
 
                 }
             }
-        } else {
+        }
+        else
+        {
             stopRecording();
         }
-    }     
+    }
 
+    if (button == recordOptionsButton)
+    {
+        int id = recordSelector->getSelectedId()-1;
+        if (id < 0) return;
+
+        recordEngines[id]->toggleConfigWindow();
+    }
+
+}
+
+void ControlPanel::comboBoxChanged(ComboBox* combo)
+{
+    if (lastEngineIndex >= 0)
+    {
+        if (recordEngines[lastEngineIndex]->isWindowOpen())
+            recordEngines[lastEngineIndex]->toggleConfigWindow();
+    }
+    RecordEngine* re;
+    getProcessorGraph()->getRecordNode()->clearRecordEngines();
+    if (combo->getSelectedId() > 0)
+    {
+        re = recordEngines[combo->getSelectedId()-1]->instantiateEngine();
+    }
+    else
+    {
+        std::cout << "Engine ComboBox: Bad ID" << std::endl;
+        combo->setSelectedId(1,dontSendNotification);
+        re = recordEngines[0]->instantiateEngine();
+    }
+    re->setUIComponent(getUIComponent());
+    re->registerManager(recordEngines[combo->getSelectedId()-1]);
+    getProcessorGraph()->getRecordNode()->registerRecordEngine(re);
+
+    graph->getRecordNode()->newDirectoryNeeded = true;
+    newDirectoryButton->setEnabledState(false);
+    masterClock->resetRecordTime();
+
+    dateText->setColour(Label::textColourId, Colours::grey);
+    lastEngineIndex=combo->getSelectedId()-1;
 }
 
 void ControlPanel::disableCallbacks()
@@ -780,11 +871,11 @@ void ControlPanel::disableCallbacks()
 
     }
 
-    playButton->setToggleState(false,false);
-    recordButton->setToggleState(false,false);
+    playButton->setToggleState(false, dontSendNotification);
+    recordButton->setToggleState(false, dontSendNotification);
+    recordSelector->setEnabled(true);
     masterClock->stopRecording();
     masterClock->stop();
-
 
 }
 
@@ -806,7 +897,7 @@ void ControlPanel::disableCallbacks()
 void ControlPanel::timerCallback()
 {
     //std::cout << "Message Received." << std::endl;
-   refreshMeters();
+    refreshMeters();
 
 }
 
@@ -893,8 +984,18 @@ void ControlPanel::saveStateToXml(XmlElement* xml)
     controlPanelState->setAttribute("isOpen",open);
     controlPanelState->setAttribute("prependText",prependText->getText());
     controlPanelState->setAttribute("appendText",appendText->getText());
+    controlPanelState->setAttribute("recordEngine",recordSelector->getSelectedId());
 
     audioEditor->saveStateToXml(xml);
+
+    XmlElement* recordEnginesState = xml->createNewChildElement("RECORDENGINES");
+    for (int i=0; i < recordEngines.size(); i++)
+    {
+        XmlElement* reState = recordEnginesState->createNewChildElement("ENGINE");
+        reState->setAttribute("id",recordEngines[i]->getID());
+        reState->setAttribute("name",recordEngines[i]->getName());
+        recordEngines[i]->saveParametersToXml(reState);
+    }
 
 }
 
@@ -908,10 +1009,22 @@ void ControlPanel::loadStateFromXml(XmlElement* xml)
 
             appendText->setText(xmlNode->getStringAttribute("appendText", ""), dontSendNotification);
             prependText->setText(xmlNode->getStringAttribute("prependText", ""), dontSendNotification);
+            recordSelector->setSelectedId(xmlNode->getIntAttribute("recordEngine",1), sendNotificationSync);
 
             bool isOpen = xmlNode->getBoolAttribute("isOpen");
             openState(isOpen);
 
+        }
+        else if (xmlNode->hasTagName("RECORDENGINES"))
+        {
+            for (int i = 0; i < recordEngines.size(); i++)
+            {
+                forEachXmlChildElementWithTagName(*xmlNode,xmlEngine,"ENGINE")
+                {
+                    if (xmlEngine->getStringAttribute("id") == recordEngines[i]->getID())
+                        recordEngines[i]->loadParametersFromXml(xmlEngine);
+                }
+            }
         }
     }
 
