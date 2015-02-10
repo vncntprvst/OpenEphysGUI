@@ -27,7 +27,8 @@
 #include "SpikeSorterCanvas.h"
 #include "../Channel/Channel.h"
 #include "../SpikeDisplayNode/SpikeDisplayNode.h"
-
+#include "../Editors/PeriStimulusTimeHistogramEditor.h"
+#include "../PSTH/PeriStimulusTimeHistogramNode.h"
 class spikeSorter;
 
 SpikeSorter::SpikeSorter()
@@ -45,7 +46,7 @@ SpikeSorter::SpikeSorter()
     spikeBuffer = new uint8_t[MAX_SPIKE_BUFFER_LEN]; // MAX_SPIKE_BUFFER_LEN defined in SpikeObject.h
 	channelBuffers=nullptr;
 	PCAbeforeBoxes = true;
-	autoDACassignment = true;
+	autoDACassignment = false;
 	syncThresholds = false;
 	flipSignal = false;
 }
@@ -187,20 +188,27 @@ void SpikeSorter::updateSettings()
 	double ContinuousBufferLengthSec = 5;
 	channelBuffers = new ContinuousCircularBuffer(numChannels,SamplingRate,1, ContinuousBufferLengthSec);
 	 
-	for (int i = 0; i < electrodes.size(); i++)
-	{
+	
+    for (int i = 0; i < electrodes.size(); i++)
+    {
 
-		Channel* ch = new Channel(this, i);
-        //ch->isEventChannel = true;
-        ch->eventType = SPIKE_BASE_CODE + electrodes[i]->numChannels;
-        ch->name = electrodes[i]->name;
+        Channel* ch;
+
+        switch (electrodes[i]->numChannels)
+        {
+            case 1:
+                ch = new Channel(this, i, SINGLE_ELECTRODE);
+                break;
+            case 2:
+                ch = new Channel(this, i, STEREOTRODE);
+                break;
+            case 4:
+                ch = new Channel(this, i, TETRODE);
+                break;
+        }
 
         eventChannels.add(ch);
-		// String eventlog = "NewElectrode "+String(electrodes[k]->electrodeID) + " "+String(electrodes[k]->numChannels)+" ";
-		// for (int j=0;j<electrodes[k]->numChannels;j++)
-		// 	eventlog += String(electrodes[k]->channels[j])+ " "+electrodes[k]->name;
-		// //addNetworkEventToQueue(StringTS(eventlog));
-	}
+    }
 	
 	mut.exit();
 }
@@ -215,7 +223,7 @@ Electrode::~Electrode()
 	delete spikeSort;
 }
 
-Electrode::Electrode(int ID, UniqueIDgenerator *uniqueIDgenerator_, PCAcomputingThread *pth, String _name, int _numChannels, int *_channels, float default_threshold, int pre, int post, float samplingRate )
+Electrode::Electrode(int ID, UniqueIDgenerator *uniqueIDgenerator_, PCAcomputingThread *pth, String _name, int _numChannels, int *_channels, float default_threshold, int pre, int post, float samplingRate , int sourceNodeId)
 {
 	electrodeID = ID;
 	computingThread = pth;
@@ -267,7 +275,7 @@ void SpikeSorter::setElectrodeVoltageScale(int electrodeID, int index, float new
 {
 	std::vector<float> values;
 	mut.enter();
-	for (int k=0;k<electrodes.size();k++)
+	for (int k = 0; k < electrodes.size(); k++)
 	{
 		if (electrodes[k]->electrodeID == electrodeID)
 		{
@@ -325,14 +333,14 @@ void SpikeSorter::addNewUnit(int electrodeID, int newUnitID, uint8 r, uint8 g, u
 {
 	String eventlog = "NewUnit "+String(electrodeID) + " "+String(newUnitID)+" "+String(r)+" "+String(g)+" "+String(b);
 	//addNetworkEventToQueue(StringTS(eventlog));
-	//updateSinks( electrodeID,  newUnitID, r,g,b,true);
+	updateSinks( electrodeID,  newUnitID, r,g,b,true);
 }
 
 void SpikeSorter::removeUnit(int electrodeID, int unitID)
 {
 	String eventlog = "RemoveUnit "+String(electrodeID) + " "+String(unitID);
 	//addNetworkEventToQueue(StringTS(eventlog));
-	//updateSinks( electrodeID,  unitID, 0,0,0,false);
+	updateSinks( electrodeID,  unitID, 0,0,0,false);
 	
 }
 
@@ -341,7 +349,7 @@ void SpikeSorter::removeAllUnits(int electrodeID)
 {
 	String eventlog = "RemoveAllUnits "+String(electrodeID);
 	//addNetworkEventToQueue(StringTS(eventlog));
-	//updateSinks( electrodeID,true);
+	updateSinks( electrodeID,true);
 }
 
 RHD2000Thread* SpikeSorter::getRhythmAccess()
@@ -399,7 +407,7 @@ void SpikeSorter::assignDACtoChannel(int dacOutput, int channel)
 	RHD2000Thread* th = getRhythmAccess();
 	if (th != nullptr)
 	{
-		th->setDACchannel(dacOutput, channels[channel]->originalStream, channels[channel]->originalChannel);
+		th->setDACchannel(dacOutput, channels[channel]->sourceNodeId, channels[channel]->index); // this is probably wrong (JHS)
 	}
 }
 
@@ -409,7 +417,7 @@ void SpikeSorter::addElectrode(Electrode* newElectrode)
     resetElectrode(newElectrode);
     electrodes.add(newElectrode);
 	// inform PSTH sink, if it exists, about this new electrode.
-	//updateSinks(newElectrode);
+	updateSinks(newElectrode);
 	mut.exit();
 }
 
@@ -435,25 +443,29 @@ bool SpikeSorter::addElectrode(int nChans, String name, double Depth)
         return false;
     }
 	
-	int *channels = new int[nChans];
+	int *chans = new int[nChans];
 	for (int k = 0; k < nChans; k++)
-		channels[k] = firstChan + k;
+		chans[k] = firstChan + k;
 
-	Electrode* newElectrode = new Electrode(++uniqueID, &uniqueIDgenerator, &computingThread, name, nChans, channels, getDefaultThreshold(), 
-		numPreSamples, numPostSamples, getSampleRate());
+	Electrode* newElectrode = new Electrode(++uniqueID, &uniqueIDgenerator, &computingThread, name, nChans, chans, getDefaultThreshold(), 
+		numPreSamples, numPostSamples, getSampleRate(), channels[chans[0]]->sourceNodeId);
 
 	newElectrode->depthOffsetMM = Depth;
 	String log = "Added electrode (ID "+ String(uniqueID)+") with " + String(nChans) + " channels." ;
     std::cout << log << std::endl;
+    for (int i = 0; i < nChans; i++)
+    {
+    	std::cout << "  Channel " << i << " = " << newElectrode->channels[i] << std::endl;
+    }
 	String eventlog = "NewElectrode "+ String(uniqueID) + " " + String(nChans) + " ";
 	for (int k = 0; k < nChans; k++)
-		eventlog += String(channels[k])+ " " + name;
+		eventlog += String(chans[k])+ " " + name;
 
 	//addNetworkEventToQueue(StringTS(eventlog));
 
     resetElectrode(newElectrode);
     electrodes.add(newElectrode);
-	//updateSinks(newElectrode);
+	updateSinks(newElectrode);
 	setCurrentElectrodeIndex(electrodes.size()-1);
 	mut.exit();
     return true;
@@ -518,7 +530,7 @@ void SpikeSorter::setElectrodeName(int index, String newName)
 	mut.enter();
 	if ((electrodes.size() > 0) && (index > 0))
 		electrodes[index-1]->name = newName;
-	//updateSinks(electrodes[index-1]->electrodeID, newName);
+	updateSinks(electrodes[index-1]->electrodeID, newName);
 	mut.exit();
 }
 
@@ -534,7 +546,7 @@ void SpikeSorter::setChannel(int electrodeIndex, int channelNum, int newChannel)
 	String eventlog = "ChanelElectrodeChannel " + String(electrodes[electrodeIndex]->electrodeID) + " " + String(channelNum) + " " + String(newChannel);
 	//addNetworkEventToQueue(StringTS(eventlog));
 	
-	//updateSinks(electrodes[electrodeIndex]->electrodeID, channelNum,newChannel);
+	updateSinks(electrodes[electrodeIndex]->electrodeID, channelNum,newChannel);
 
     *(electrodes[electrodeIndex]->channels+channelNum) = newChannel;
 	mut.exit();
@@ -634,7 +646,12 @@ void SpikeSorter::setParameter(int parameterIndex, float newValue)
 bool SpikeSorter::enable()
 {
 
-    useOverflowBuffer = false;
+    useOverflowBuffer.clear();
+
+    for (int i = 0; i < electrodes.size(); i++)
+        useOverflowBuffer.add(false);
+
+
 	SpikeSorterEditor* editor = (SpikeSorterEditor*) getEditor();
 	 editor->enable();
 	
@@ -695,7 +712,7 @@ void SpikeSorter::addWaveformToSpikeObject(SpikeObject* s,
     int spikeLength = electrodes[electrodeNumber]->prePeakSamples +
                       + electrodes[electrodeNumber]->postPeakSamples;
 	
-    s->timestamp = hardware_timestamp + peakIndex;
+    s->timestamp = getTimestamp(currentChannel) + peakIndex;
 
 	// convert sample offset to software ticks
 	float samplesPerSec = getSampleRate();
@@ -704,7 +721,7 @@ void SpikeSorter::addWaveformToSpikeObject(SpikeObject* s,
 
     int chan = *(electrodes[electrodeNumber]->channels+currentChannel);
 
-	s->gain[currentChannel] = (1.0f / channels[chan]->getChannelGain())*1000;
+	s->gain[currentChannel] = (1.0f / channels[chan]->bitVolts)*1000;
     s->threshold[currentChannel] = (int) electrodes[electrodeNumber]->thresholds[currentChannel]; 
 
     // cycle through buffer
@@ -718,7 +735,7 @@ void SpikeSorter::addWaveformToSpikeObject(SpikeObject* s,
             // warning -- be careful of bitvolts conversion
 			// do not flip signal (!).
 			float value = getNextSample(electrodes[electrodeNumber]->channels[currentChannel]);
-			s->data[currentIndex] = uint16(jmin(65535,jmax(0, int(value / channels[chan]->getChannelGain()) + 32768)));
+			s->data[currentIndex] = uint16(jmin(65535,jmax(0, int(value / channels[chan]->bitVolts) + 32768)));
  			// recovered data
 			//float value2 = (s->data[currentIndex]-32768) /float(s->gain[currentChannel])*1000.0f;
 
@@ -844,8 +861,7 @@ void SpikeSorter::handleEvent(int eventType, MidiMessage& event, int sampleNum)
 // }
 
 void SpikeSorter::process(AudioSampleBuffer& buffer,
-                            MidiBuffer& events,
-                            int& nSamples)
+                            MidiBuffer& events)
 {
 	
 	//printf("Entering Spike Detector::process\n");
@@ -857,9 +873,7 @@ void SpikeSorter::process(AudioSampleBuffer& buffer,
 	
     checkForEvents(events); // find latest's packet timestamps
 	
-	//postEventsInQueue(events);
-
-	channelBuffers->update(buffer,  hardware_timestamp,software_timestamp,nSamples);
+	//channelBuffers->update(buffer, hardware_timestamp,software_timestamp, nSamples);
 
     for (int i = 0; i < electrodes.size(); i++)
     {
@@ -871,6 +885,8 @@ void SpikeSorter::process(AudioSampleBuffer& buffer,
         // refresh buffer index for this electrode
         sampleIndex = electrode->lastBufferIndex - 1; // subtract 1 to account for
         // increment at start of getNextSample()
+
+        int nSamples = getNumSamples(*electrode->channels); // get the number of samples for this buffer
 
         // cycle through samples
         while (samplesAvailable(nSamples))
@@ -928,7 +944,7 @@ void SpikeSorter::process(AudioSampleBuffer& buffer,
 
                         SpikeObject newSpike;
 						newSpike.sortedId = 0; // unsorted.
-                        newSpike.timestamp = peakIndex;
+                        newSpike.timestamp = getTimestamp(currentChannel) + peakIndex;
 						newSpike.electrodeID = electrode->electrodeID;
 						newSpike.channel = chan;
                         newSpike.source = i;
@@ -1002,39 +1018,29 @@ void SpikeSorter::process(AudioSampleBuffer& buffer,
 
         //jassert(electrode->lastBufferIndex < 0);
 
-    } // end cycle through electrodes
-
-    // copy end of this buffer into the overflow buffer
-
-    //std::cout << "Copying buffer" << std::endl;
-    // std::cout << "nSamples: " << nSamples;
-    //std::cout << "overflowBufferSize:" << overflowBufferSize;
-
-    //std::cout << "sourceStartSample = " << nSamples-overflowBufferSize << std::endl;
-    // std::cout << "numSamples = " << overflowBufferSize << std::endl;
-    // std::cout << "buffer size = " << buffer.getNumSamples() << std::endl;
-
-    if (nSamples > overflowBufferSize)
-    {
-
-        for (int i = 0; i < overflowBuffer.getNumChannels(); i++)
+        if (nSamples > overflowBufferSize)
         {
 
-            overflowBuffer.copyFrom(i, 0,
-                                    buffer, i,
-                                    nSamples-overflowBufferSize,
-                                    overflowBufferSize);
+            for (int j = 0; j < electrode->numChannels; j++)
+            {
+            	//std::cout << "Processing " << *electrode->channels+i << std::endl;
 
+                overflowBuffer.copyFrom(*(electrode->channels+j), 0,
+                                        buffer, *(electrode->channels+j),
+                                        nSamples-overflowBufferSize,
+                                        overflowBufferSize);
+                
+            }
 
-            useOverflowBuffer = true;
+            useOverflowBuffer.set(i, true);
+
+        }
+        else
+        {
+            useOverflowBuffer.set(i, false);
         }
 
-    }
-    else
-    {
-
-        useOverflowBuffer = false;
-    }
+    } // end cycle through electrodes
 
 
 	mut.exit();
@@ -1102,7 +1108,7 @@ float SpikeSorter::getCurrentSample(int& chan)
 }
 
 
-bool SpikeSorter::samplesAvailable(int& nSamples)
+bool SpikeSorter::samplesAvailable(int nSamples)
 {
 
     if (sampleIndex > nSamples - overflowBufferSize/2)
@@ -1121,7 +1127,7 @@ void SpikeSorter::addProbes(String probeType,int numProbes, int nElectrodesPerPr
 	for (int probeIter=0;probeIter<numProbes;probeIter++)
 	{
 		int probeCounter = getUniqueProbeID(probeType);
-		for (int electrodeIter=0;electrodeIter<nElectrodesPerProbe;electrodeIter++)
+		for (int electrodeIter = 0; electrodeIter < nElectrodesPerProbe; electrodeIter++)
 		{
 			double depth = firstContactOffset - electrodeIter*interelectrodeDistance;
 			String name;
@@ -1327,8 +1333,11 @@ void SpikeSorter::loadCustomParametersFromXml()
 								isActive[channelIndex] = channelNode->getBoolAttribute("isActive");
 							}
 						}
+
+						int sourceNodeId = 102010; // some number
+
 						Electrode* newElectrode = new Electrode(electrodeID, &uniqueIDgenerator,&computingThread, electrodeName, channelsPerElectrode, channels,getDefaultThreshold(),
-							numPreSamples,numPostSamples, getSampleRate());
+							numPreSamples,numPostSamples, getSampleRate(), sourceNodeId);
 						for (int k=0;k<channelsPerElectrode;k++)
 						{
 							newElectrode->thresholds[k] = thres[k];
@@ -1465,6 +1474,152 @@ Electrode* SpikeSorter::setCurrentElectrodeIndex(int i)
 	currentElectrode = i;
 	return electrodes[i];
 }
+
+
+void SpikeSorter::updateSinks(int electrodeID, int unitID, uint8 r, uint8 g, uint8 b, bool addRemove)
+{
+	// inform sinks about a new unit
+	ProcessorGraph *gr = getProcessorGraph();
+	Array<GenericProcessor*> p = gr->getListOfProcessors();
+	for (int k = 0; k<p.size(); k++)
+	{
+		if (p[k]->getName() == "PSTH")
+		{
+			PeriStimulusTimeHistogramNode *node = (PeriStimulusTimeHistogramNode*)p[k];
+			if (node->trialCircularBuffer != nullptr)
+			{
+				if (addRemove)
+				{
+					// add electrode
+					node->trialCircularBuffer->addNewUnit(electrodeID, unitID, r, g, b);
+				}
+				else
+				{
+					// remove electrode
+					node->trialCircularBuffer->removeUnit(electrodeID, unitID);
+				}
+				((PeriStimulusTimeHistogramEditor *)node->getEditor())->updateCanvas();
+			}
+		}
+	}
+}
+
+void SpikeSorter::updateSinks(int electrodeID, bool rem)
+{
+	// inform sinks about a removal of all units
+	ProcessorGraph *g = getProcessorGraph();
+	Array<GenericProcessor*> p = g->getListOfProcessors();
+	for (int k = 0; k<p.size(); k++)
+	{
+		if (p[k]->getName() == "PSTH")
+		{
+			PeriStimulusTimeHistogramNode *node = (PeriStimulusTimeHistogramNode*)p[k];
+			if (node->trialCircularBuffer != nullptr)
+			{
+				if (rem)
+				{
+					node->trialCircularBuffer->removeAllUnits(electrodeID);
+				}
+				(((PeriStimulusTimeHistogramEditor *)node->getEditor()))->updateCanvas();
+			}
+		}
+		/*
+		if (p[k]->getName() == "Spike Viewer")
+		{
+			SpikeSorter* node = (SpikeSorter*)p[k];
+			node->syncWithSpikeSorter();
+		}
+		*/
+	}
+}
+
+void SpikeSorter::updateSinks(int electrodeID, int channelindex, int newchannel)
+{
+	// inform sinks about a channel change
+	ProcessorGraph *g = getProcessorGraph();
+	Array<GenericProcessor*> p = g->getListOfProcessors();
+	for (int k = 0; k<p.size(); k++)
+	{
+		if (p[k]->getName() == "PSTH")
+		{
+			PeriStimulusTimeHistogramNode *node = (PeriStimulusTimeHistogramNode*)p[k];
+			if (node->trialCircularBuffer != nullptr)
+			{
+				node->trialCircularBuffer->channelChange(electrodeID, channelindex, newchannel);
+			}
+		}
+
+	}
+}
+
+
+void SpikeSorter::updateSinks(Electrode* electrode)
+{
+	// inform sinks about an electrode add 
+	ProcessorGraph *g = getProcessorGraph();
+	Array<GenericProcessor*> p = g->getListOfProcessors();
+	for (int k = 0; k<p.size(); k++)
+	{
+		String s = p[k]->getName();
+		if (p[k]->getName() == "PSTH")
+		{
+			PeriStimulusTimeHistogramNode *node = (PeriStimulusTimeHistogramNode*)p[k];
+			if (node->trialCircularBuffer != nullptr)
+			{
+				// add electrode
+				node->trialCircularBuffer->addNewElectrode(electrode);
+				(((PeriStimulusTimeHistogramEditor *)node->getEditor()))->updateCanvas();
+			}
+		}
+
+	}
+}
+
+void SpikeSorter::updateSinks(int electrodeID, String NewName)
+{
+	// inform sinks about an electrode name change
+	ProcessorGraph *g = getProcessorGraph();
+	Array<GenericProcessor*> p = g->getListOfProcessors();
+	for (int k = 0; k < p.size(); k++)
+	{
+		String s = p[k]->getName();
+		if (p[k]->getName() == "PSTH")
+		{
+			PeriStimulusTimeHistogramNode *node = (PeriStimulusTimeHistogramNode*)p[k];
+			if (node->trialCircularBuffer != nullptr)
+			{
+				// add electrode
+				node->trialCircularBuffer->updateElectrodeName(electrodeID, NewName);
+				(((PeriStimulusTimeHistogramEditor *)node->getEditor()))->updateCanvas();
+			}
+		}
+
+	}
+}
+
+
+void SpikeSorter::updateSinks(int electrodeID)
+{
+	// inform sinks about an electrode removal
+	ProcessorGraph *g = getProcessorGraph();
+	Array<GenericProcessor*> p = g->getListOfProcessors();
+	for (int k = 0; k<p.size(); k++)
+	{
+		String s = p[k]->getName();
+		if (p[k]->getName() == "PSTH")
+		{
+			PeriStimulusTimeHistogramNode *node = (PeriStimulusTimeHistogramNode*)p[k];
+			if (node->trialCircularBuffer != nullptr)
+			{
+				// remove electrode
+				node->trialCircularBuffer->removeElectrode(electrodeID);
+				((PeriStimulusTimeHistogramEditor *)node->getEditor())->updateCanvas();
+			}
+		}
+
+	}
+}
+
 /*
 
 

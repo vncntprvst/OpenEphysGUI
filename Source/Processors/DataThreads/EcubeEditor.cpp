@@ -22,31 +22,68 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 */
 
+#include "EcubeThread.h"
 #include "EcubeEditor.h"
 
-#include "EcubeThread.h"
 
 #include <stdio.h>
 
-EcubeEditor::EcubeEditor(GenericProcessor* parentNode, bool useDefaultParameterEditors = true)
-: GenericEditor(parentNode, useDefaultParameterEditors)
+#ifdef ECUBE_COMPILE
+
+EcubeEditor::EcubeEditor(GenericProcessor* parentNode, EcubeThread* npThread, bool useDefaultParameterEditors = true)
+: GenericEditor(parentNode, useDefaultParameterEditors), pThread(npThread)
 
 {
     desiredWidth = 180;
 
-    ipLabel = new Label("IP address label", "Address");
-    ipLabel->setBounds(35, 80, 180, 20);
-    ipLabel->setFont(Font("Small Text", 12, Font::plain));
-    addAndMakeVisible(ipLabel);
+    if (pThread->getNumHeadstageOutputs())
+    {
+        volLabel = new Label("Volume text label", "Volume");
+        volLabel->setBounds(35, 20, 180, 20);
+        volLabel->setFont(Font("Small Text", 12, Font::plain));
+        addAndMakeVisible(volLabel);
 
-    ipValue = new Label("IP address value", "127.0.0.1");
-    ipValue->setBounds(40, 50, 60, 20);
-    ipValue->setFont(Font("Default", 15, Font::plain));
-    ipValue->setColour(Label::textColourId, Colours::white);
-    ipValue->setColour(Label::backgroundColourId, Colours::grey);
-    ipValue->setEditable(true);
-    ipValue->addListener(this);
-    addAndMakeVisible(ipValue);
+        volSlider = new Slider("Volume slider");
+        volSlider->setBounds(20, 40, 80, 20);
+        volSlider->setSliderStyle(Slider::LinearHorizontal);
+        volSlider->setTextBoxStyle(Slider::NoTextBox, true, 0, 0);
+        volSlider->setRange(0.0, 1.0);
+        volSlider->addListener(this);
+        addAndMakeVisible(volSlider);
+
+        chanLabel = new Label("Channel text label", "Channel");
+        chanLabel->setBounds(35, 60, 180, 20);
+        chanLabel->setFont(Font("Small Text", 12, Font::plain));
+        addAndMakeVisible(chanLabel);
+
+        chanComboBox = new ComboBox("Channel combo box");
+        chanComboBox->setBounds(20, 80, 100, 20);
+        chanComboBox->setEditableText(false);
+        for (int i = 0; i < pThread->getNumChannels(); i++)
+        {
+            String s;
+            s << i + 1;
+            chanComboBox->addItem(s, i + 1);
+        }
+        chanComboBox->setSelectedId(1, false);
+        chanComboBox->setTooltip("Channel to monitor on the embedded speaker");
+        chanComboBox->setScrollWheelEnabled(true);
+        chanComboBox->addListener(this);
+        addAndMakeVisible(chanComboBox);
+    }
+    else if (pThread->getNumAdcOutputs())
+    {
+        samplerateLabel = new Label("Samplerate label", "Sample Rate (Hz):");
+        samplerateLabel->setBounds(10, 20, 180, 20);
+        samplerateLabel->setFont(Font("Small Text", 12, Font::plain));
+        addAndMakeVisible(samplerateLabel);
+
+        samplerateValueLabel = new Label("Samplerate label", String(pThread->getSampleRate(),3));
+        samplerateValueLabel->setBounds(20, 40, 180, 20);
+        samplerateValueLabel->setFont(Font("Small Text", 12, Font::plain));
+        addAndMakeVisible(samplerateValueLabel);
+
+    }
 
 }
 
@@ -55,98 +92,17 @@ EcubeEditor::~EcubeEditor()
 
 }
 
-void EcubeEditor::labelTextChanged(Label* label)
-{/*
-    FilterNode* fn = (FilterNode*)getProcessor();
 
-    Value val = label->getTextValue();
-    double requestedValue = double(val.getValue());
-
-    if (requestedValue < 0.01 || requestedValue > 10000)
-    {
-        sendActionMessage("Value out of range.");
-
-        if (label == highCutValue)
-        {
-            label->setText(lastHighCutString, dontSendNotification);
-            lastHighCutString = label->getText();
-        }
-        else
-        {
-            label->setText(lastLowCutString, dontSendNotification);
-            lastLowCutString = label->getText();
-        }
-
-        return;
-    }
-
-    Array<int> chans = getActiveChannels();
-
-    // This needs to change, since there's not enough feedback about whether
-    // or not individual channel settings were altered:
-
-    for (int n = 0; n < chans.size(); n++)
-    {
-
-        if (label == highCutValue)
-        {
-            double minVal = fn->getLowCutValueForChannel(n);
-
-            if (requestedValue > minVal)
-            {
-                fn->setCurrentChannel(n);
-                fn->setParameter(1, requestedValue);
-            }
-
-            lastHighCutString = label->getText();
-
-        }
-        else
-        {
-            double maxVal = fn->getHighCutValueForChannel(n);
-
-            if (requestedValue < maxVal)
-            {
-                fn->setCurrentChannel(n);
-                fn->setParameter(0, requestedValue);
-            }
-
-            lastLowCutString = label->getText();
-        }
-
-    }
-*/
-}
-
-
-void EcubeEditor::buttonEvent(Button* button)
+void EcubeEditor::sliderValueChanged(Slider* slider)
 {
-
-    if (!acquisitionIsActive)
-    {
-
-/*        if (button == fileButton)
-        {
-            //std::cout << "Button clicked." << std::endl;
-            FileChooser chooseFileReaderFile("Please select the file you want to load...",
-                lastFilePath,
-                "*");
-
-            if (chooseFileReaderFile.browseForFileToOpen())
-            {
-                // Use the selected file
-                setFile(chooseFileReaderFile.getResult().getFullPathName());
-
-                // lastFilePath = fileToRead.getParentDirectory();
-
-                // thread->setFile(fileToRead.getFullPathName());
-
-                // fileNameLabel->setText(fileToRead.getFileName(),false);
-            }
-        }
-        */
-    }
+    pThread->setSpeakerVolume(slider->getValue());
 }
+
+void EcubeEditor::comboBoxChanged(ComboBox* comboBoxThatHasChanged)
+{
+    pThread->setSpeakerChannel(comboBoxThatHasChanged->getSelectedId() - 1);
+}
+
 
 void EcubeEditor::saveEditorParameters(XmlElement* xml)
 {
@@ -171,3 +127,5 @@ void EcubeEditor::loadEditorParameters(XmlElement* xml)
     //   }
 
 }
+
+#endif //ECUBE_COMPILE

@@ -47,7 +47,7 @@ PulsePalOutput::PulsePalOutput()
 PulsePalOutput::~PulsePalOutput()
 {
 
-    pulsePal.updateDisplay("PULSE PAL v0.3","Click for menu");
+    pulsePal.updateDisplay("PULSE PAL v1.0","Click for menu");
 }
 
 AudioProcessorEditor* PulsePalOutput::createEditor()
@@ -121,8 +121,7 @@ void PulsePalOutput::setParameter(int parameterIndex, float newValue)
 }
 
 void PulsePalOutput::process(AudioSampleBuffer& buffer,
-                             MidiBuffer& events,
-                             int& nSamples)
+                             MidiBuffer& events)
 {
 
     checkForEvents(events);

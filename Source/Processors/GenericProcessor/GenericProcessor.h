@@ -24,8 +24,9 @@
 #ifndef __GENERICPROCESSOR_H_1F469DAF__
 #define __GENERICPROCESSOR_H_1F469DAF__
 
-enum channelType {DATA_CHANNEL = 0, AUX_CHANNEL = 1, ADC_CHANNEL = 2, EVENT_CHANNEL = 3};
-
+enum ChannelType {HEADSTAGE_CHANNEL = 0, AUX_CHANNEL = 1, ADC_CHANNEL = 2, EVENT_CHANNEL = 3,
+                  SINGLE_ELECTRODE = 4, STEREOTRODE = 5, TETRODE = 6, MESSAGE_CHANNEL = 7
+                 };
 
 #include "../../../JuceLibraryCode/JuceHeader.h"
 #include "../Editors/GenericEditor.h"
@@ -35,6 +36,7 @@ enum channelType {DATA_CHANNEL = 0, AUX_CHANNEL = 1, ADC_CHANNEL = 2, EVENT_CHAN
 
 #include <time.h>
 #include <stdio.h>
+#include <map>
 
 class EditorViewport;
 class DataViewport;
@@ -59,7 +61,6 @@ class Channel;
   @see ProcessorGraph, GenericEditor, SourceNode, FilterNode, LfpDisplayNode
 
 */
-
 
 class GenericProcessor : public AudioProcessor,
     public AccessClass
@@ -137,23 +138,23 @@ public:
     {
         return GenericProcessor::unusedNameString;
     }
-    
+
     /** returns the names and types of all data, aux and adc channels */
-    virtual void getChannelsInfo(StringArray &Names, Array<channelType> &type, Array<int> &stream, Array<int> &originalChannelNumber, Array<float> &gains)
+    virtual void getChannelsInfo(StringArray& Names, Array<ChannelType>& type, Array<int>& stream, Array<int>& originalChannelNumber, Array<float>& gains)
     {
 
     }
 
-    virtual int modifyChannelName(channelType t, int stream, int ch, String newName, bool updateSignalChain)
-    {
-        return -1;
-    }
-
-    virtual int modifyChannelGain(channelType t, int stream, int ch, float newGain, bool updateSignalChain)
+    virtual int modifyChannelName(ChannelType t, int stream, int ch, String newName, bool updateSignalChain)
     {
         return -1;
     }
-    virtual void getEventChannelNames(StringArray &Names)
+
+    virtual int modifyChannelGain(ChannelType t, int stream, int ch, float newGain, bool updateSignalChain)
+    {
+        return -1;
+    }
+    virtual void getEventChannelNames(StringArray& Names)
     {
     }
 
@@ -260,8 +261,7 @@ public:
     the number of samples in the current buffer.
     */
     virtual void process(AudioSampleBuffer& continuousBuffer,
-                         MidiBuffer& eventBuffer,
-                         int& nSamples) = 0;
+                         MidiBuffer& eventBuffer) = 0;
 
     /** Pointer to a processor's immediate source node.*/
     GenericProcessor* sourceNode;
@@ -293,13 +293,26 @@ public:
         return settings.numOutputs;
     }
 
-    /** Returns the default number of outputs, in case a processor has no source (or is itself a source).*/
-    virtual int getDefaultNumOutputs()
+    /** Returns the default number of headstage (neural data) outputs, in case a processor has no source (or is itself a source).*/
+    virtual int getNumHeadstageOutputs()
     {
         return 2;
     }
 
-      virtual int getDefaultADCoutputs()
+    /** Returns the default number of ADC (typically 0-5V, or -5 to +5V) outputs. */
+    virtual int getNumAdcOutputs()
+    {
+        return 0;
+    }
+
+    /** Returns the default number of auxiliary (e.g. accelerometer) outputs. */
+    virtual int getNumAuxOutputs()
+    {
+        return 0;
+    }
+
+    /** Returns the default number of event channels. */
+    virtual int getNumEventChannels()
     {
         return 0;
     }
@@ -310,11 +323,11 @@ public:
         return 1.0;
     }
 
-	/** Returns the bit volts for a given channel **/
-	virtual float getBitVolts(int chan)
-	{
-		return 1.0; 
-	}
+    /** Returns the bit volts for a given channel **/
+    virtual float getBitVolts(Channel* chan)
+    {
+        return 1.0;
+    }
 
 
     /** Returns the next available channel (and increments the channel if the input is set to 'true'. */
@@ -371,6 +384,12 @@ public:
     /** Sets one of two possible source nodes for a splitter.*/
     virtual void setSplitterDestNode(GenericProcessor* dn) { }
 
+	/** Returns trus if a processor generates its own timestamps, false otherwise.*/
+	virtual bool generatesTimestamps()
+	{
+		return false;
+	}
+
     /** Returns true if a processor is a source, false otherwise.*/
     virtual bool isSource()
     {
@@ -394,7 +413,7 @@ public:
     {
         return false;
     }
-    
+
     /** Returns true if a processor is a utility (non-merger or splitter), false otherwise.*/
     virtual bool isUtility()
     {
@@ -428,9 +447,9 @@ public:
         return true;
     }
 
-	/** Called when recording starts/stops **/
-	void setRecording(bool state);
-    
+    /** Called when recording starts/stops **/
+    void setRecording(bool state);
+
     /** Called from setRecording whenever recording has started. */
     virtual void startRecording() { }
 
@@ -491,7 +510,8 @@ public:
                           uint8 eventID = 0,
                           uint8 eventChannel = 0,
                           uint8 numBytes = 0,
-                          uint8* data = 0);
+                          uint8* data = 0,
+						  bool isTimestamp = false);
 
     /** Makes it easier for processors to respond to incoming events, such as TTLs and spikes.
 
@@ -511,14 +531,6 @@ public:
         EYE_POSITION = 8,
         SERIAL = 9,
         MESSAGE = 10
-    };
-
-    enum eventChannelTypes
-    {
-        GENERIC_EVENT = 100,
-        SINGLE_ELECTRODE = 1,
-        STEREOTRODE = 2,
-        TETRODE = 4
     };
 
     /** Variable used to orchestrate saving the ProcessorGraph. */
@@ -617,13 +629,31 @@ public:
     virtual void loadCustomChannelParametersFromXml(XmlElement* channelElement, bool isEventChannel=false);
 
     /** handle messages from other processors */
-    virtual String interProcessorCommunication(String command) { return String("OK"); };
+    virtual String interProcessorCommunication(String command)
+    {
+        return String("OK");
+    };
 
     /** Holds loaded parameters */
     XmlElement* parametersAsXml;
 
     /** When set to false, this disables the sending of sample counts through the event buffer. */
     bool sendSampleCount;
+
+    /** Used to get the number of samples in a given buffer, for a given channel. */
+    int getNumSamples(int channelNumber);
+
+    /** Used to get the number of samples in a given buffer, for a given source node. */
+    void setNumSamples(MidiBuffer&, int numSamples);
+
+    /** Used to get the timestamp for a given buffer, for a given channel. */
+    int64 getTimestamp(int channelNumber);
+
+    /** Used to set the timestamp for a given buffer, for a given source node. */
+    void setTimestamp(MidiBuffer&, int64 timestamp);
+
+    std::map<uint8, int> numSamples;
+    std::map<uint8, int64> timestamps;
 
 private:
 
@@ -638,19 +668,14 @@ private:
     Array<bool> recordStatus;
 	Array<bool> monitorStatus;
 
-    /** Returns the number of samples for the current continuous buffer (assumed to be
-    the same for all channels).*/
-    int getNumSamples(MidiBuffer&);
-
-    /** Updates the number of samples for the current continuous buffer (assumed to be
-    the same for all channels).*/
-    void setNumSamples(MidiBuffer&, int);
+    /** Extracts sample counts and timestamps from the MidiBuffer. */
+    int processEventBuffer(MidiBuffer&);
 
     /** For getInputChannelName() and getOutputChannelName() */
     static const String unusedNameString;
 
     bool paramsWereLoaded;
-
+	bool needsToSendTimestampMessage;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(GenericProcessor);
 

@@ -84,7 +84,7 @@ private:
 class Electrode
 {
 	public:
-		Electrode(int electrodeID, UniqueIDgenerator *uniqueIDgenerator_, PCAcomputingThread *pth,String _name, int _numChannels, int *_channels, float default_threshold, int pre, int post, float samplingRate );
+		Electrode(int electrodeID, UniqueIDgenerator *uniqueIDgenerator_, PCAcomputingThread *pth,String _name, int _numChannels, int *_channels, float default_threshold, int pre, int post, float samplingRate , int sourceNodeId);
         ~Electrode();
 
 		void resizeWaveform(int numPre, int numPost);
@@ -99,6 +99,7 @@ class Electrode
 		float depthOffsetMM;
 
 		int electrodeID;
+		int sourceNodeId;
         int* channels;
 	    double* thresholds;
         bool* isActive;
@@ -161,7 +162,7 @@ public:
 
     /** Processes an incoming continuous buffer and places new
         spikes into the event buffer. */
-    void process(AudioSampleBuffer& buffer, MidiBuffer& events, int& nSamples);
+    void process(AudioSampleBuffer& buffer, MidiBuffer& events);
 
     /** Used to alter parameters of data acquisition. */
     void setParameter(int parameterIndex, float newValue);
@@ -299,6 +300,21 @@ public:
 
     std::vector<String> electrodeTypes;
 
+	/** sync PSTH : inform of a new electrode added  */
+	void updateSinks(Electrode* newElectrode);
+	/** sync PSTH : inform of an electrode removal */
+	void updateSinks(int electrodeID);
+	/** sync PSTH : inform of a channel swap */
+	void updateSinks(int electrodeID, int channelindex, int newchannel);
+	/** sync PSTH: inform of a new unit added / removed */
+	void updateSinks(int electrodeID, int unitID, uint8 r, uint8 g, uint8 b, bool addRemove);
+	/** sync PSTH: inform of a name change*/
+	void updateSinks(int electrodeID, String NewName);
+	/** sync PSTH: remove all units*/
+	void updateSinks(int electrodeID, bool b);
+
+
+
 private:
 	UniqueIDgenerator uniqueIDgenerator;
 	long uniqueSpikeID;
@@ -323,9 +339,9 @@ private:
     std::vector<int> electrodeCounter;
     float getNextSample(int& chan);
     float getCurrentSample(int& chan);
-    bool samplesAvailable(int& nSamples);
+    bool samplesAvailable(int nSamples);
 
-    bool useOverflowBuffer;
+    Array<bool> useOverflowBuffer;
 
     int currentElectrode;
     int currentChannelIndex;

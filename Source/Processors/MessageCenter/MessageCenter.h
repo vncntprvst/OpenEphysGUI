@@ -50,7 +50,7 @@ public:
     ~MessageCenter();
 
     /** Handle incoming data and decide which files and events to write to disk. */
-    void process(AudioSampleBuffer& buffer, MidiBuffer& eventBuffer, int& nSamples);
+    void process(AudioSampleBuffer& buffer, MidiBuffer& eventBuffer);
 
     /** Called when new events arrive. */
     void setParameter(int parameterIndex, float newValue);
@@ -61,14 +61,35 @@ public:
     /** A pointer to the Message Center editor. */
     ScopedPointer<MessageCenterEditor> messageCenterEditor;
 
-    void startRecording() {isRecording = true;}
-    void stopRecording() {isRecording = false;}
+	bool enable();
+	bool disable();
 
+    void startRecording()
+    {
+        isRecording = true;
+		needsToSendTimestampMessage = true;
+    }
+    void stopRecording()
+    {
+        isRecording = false;
+		needsToSendTimestampMessage = false;
+    }
+
+    void setSourceNodeId(int id);
+    int getSourceNodeId();
+
+    void addSourceProcessor(GenericProcessor* p);
+    void removeSourceProcessor(GenericProcessor* p);
+
+	int64 getTimestamp(bool softwareTime = false);
 private:
 
     bool newEventAvailable;
-
     bool isRecording;
+    int sourceNodeId;
+	GenericProcessor* timestampSource;
+	int64 msTime;
+	bool needsToSendTimestampMessage;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MessageCenter);
 

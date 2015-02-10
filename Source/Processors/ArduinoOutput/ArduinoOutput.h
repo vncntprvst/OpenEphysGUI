@@ -26,7 +26,6 @@
 
 #include "../../../JuceLibraryCode/JuceHeader.h"
 
-#include "ArduinoOutputEditor.h"
 #include "../Serial/ofArduino.h"
 #include "../GenericProcessor/GenericProcessor.h"
 
@@ -51,7 +50,7 @@ public:
     ~ArduinoOutput();
 
     /** Searches for events and triggers the Arduino output when appropriate. */
-    void process(AudioSampleBuffer& buffer, MidiBuffer& events, int& nSamples);
+    void process(AudioSampleBuffer& buffer, MidiBuffer& events);
 
     /** Currently unused. Future uses may include changing the TTL trigger channel
     or the output channel of the Arduino. */
@@ -75,12 +74,23 @@ public:
         return true;
     }
 
+    void setOutputChannel(int);
+    void setInputChannel(int);
+    void setGateChannel(int);
+    void setDevice(String deviceString);
+
+    int outputChannel;
+    int inputChannel;
+    int gateChannel;
+
 private:
 
     /** An open-frameworks Arduino object. */
     ofArduino arduino;
 
     bool state;
+    bool acquisitionIsActive;
+    bool deviceSelected;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ArduinoOutput);
 

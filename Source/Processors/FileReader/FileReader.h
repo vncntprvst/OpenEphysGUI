@@ -49,7 +49,7 @@ public:
     FileReader();
     ~FileReader();
 
-    void process(AudioSampleBuffer& buffer, MidiBuffer& midiMessages, int& nSamples);
+    void process(AudioSampleBuffer& buffer, MidiBuffer& midiMessages);
     void setParameter(int parameterIndex, float newValue);
 
     AudioProcessorEditor* createEditor();
@@ -68,11 +68,17 @@ public:
         return true;
     }
 
+	bool generatesTimestamps()
+	{
+		return true;
+	}
+
     void enabledState(bool t);
 
     float getDefaultSampleRate();
-    int getDefaultNumOutputs();
-    float getBitVolts(int chan);
+    int getNumHeadstageOutputs();
+    int getNumEventChannels();
+    float getBitVolts(Channel* chan);
 
     bool setFile(String fullpath);
     String getFile();
@@ -89,6 +95,8 @@ private:
     Array<RecordedChannelInfo> channelInfo;
 
     int64 currentSample;
+
+    int counter; // for testing purposes only
 
     ScopedPointer<FileSource> input;
 
