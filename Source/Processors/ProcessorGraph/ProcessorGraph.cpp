@@ -53,7 +53,7 @@
 #include "../NetworkEvents/NetworkEvents.h"
 #include "../PSTH/PeriStimulusTimeHistogramNode.h"
 #include "../CAR/CAR.h"
-
+#include "../Rectifier/Rectifier.h"
 
 #ifdef ZEROMQ 
     
@@ -582,6 +582,11 @@ GenericProcessor* ProcessorGraph::createProcessorFromDescription(String& descrip
             processor = new FilterNode();
 
         }
+        else if (subProcessorType.equalsIgnoreCase("Rectifier"))
+        {
+            std::cout << "Creating a new rectifier node." << std::endl;
+            processor = new Rectifier();
+        }
         else if (subProcessorType.equalsIgnoreCase("Spike Detector"))
         {
             std::cout << "Creating a new spike detector." << std::endl;
@@ -723,11 +728,15 @@ void ProcessorGraph::removeProcessor(GenericProcessor* processor)
         //Look for the next source node. If none is found, set the sourceid to 0
         for (int i = 0; i < getNumNodes() && newId == 0; i++)
         {
-            GenericProcessor* p = static_cast<GenericProcessor*>(getNode(i)->getProcessor());
-			if (p->isSource() && p->generatesTimestamps())
-            {
-                newId = p->nodeId;
-            }
+			if (getNode(i)->nodeId != OUTPUT_NODE_ID)
+			{
+				GenericProcessor* p = dynamic_cast<GenericProcessor*>(getNode(i)->getProcessor());
+				//GenericProcessor* p = static_cast<GenericProcessor*>(getNode(i)->getProcessor());
+				if (p && p->isSource() && p->generatesTimestamps())
+				{
+					newId = p->nodeId;
+				}
+			}
         }
         getMessageCenter()->setSourceNodeId(newId);
     }

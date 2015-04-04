@@ -342,7 +342,9 @@ String OriginalRecording::generateSpikeHeader(SpikeRecordInfo* elec)
     header += String(HEADER_SIZE);
     header += ";\n";
 
-    header += "header.description = 'Each record contains 1 uint8 eventType, 1 int64 timestamp, 1 uint16 electrodeID, 1 uint16 numChannels (n), 1 uint16 numSamples (m), n*m uint16 samples, n uint16 channelGains, n uint16 thresholds, and 1 uint16 recordingNumber'; \n";
+    header += "header.description = 'Each record contains 1 uint8 eventType, 1 int64 timestamp, 1 int64 software timestamp, "
+		"1 uint16 sourceID, 1 uint16 numChannels (n), 1 uint16 numSamples (m), 1 uint16 sortedID, 1 uint16 electrodeID, "
+		"1 uint16 channel, 3 uint8 color codes, 2 float32 component projections, n*m uint16 samples, n float32 channelGains, n uint16 thresholds, and 1 uint16 recordingNumber'; \n";
 
     header += "header.date_created = '";
     header += generateDateString();
@@ -369,9 +371,9 @@ String OriginalRecording::generateSpikeHeader(SpikeRecordInfo* elec)
 
 void OriginalRecording::writeEvent(int eventType, MidiMessage& event, int samplePosition)
 {
-    if (eventType == GenericProcessor::TTL)
+    if (isWritableEvent(eventType))
         writeTTLEvent(event,samplePosition);
-    else if (eventType == GenericProcessor::MESSAGE || eventType == GenericProcessor::NETWORK)
+    if (eventType == GenericProcessor::MESSAGE)
         writeMessage(event,samplePosition);
 }
 

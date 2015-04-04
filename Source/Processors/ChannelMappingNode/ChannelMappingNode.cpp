@@ -73,6 +73,7 @@ void ChannelMappingNode::updateSettings()
 	    OwnedArray<Channel> oldChannels;
 		oldChannels.swapWith(channels);
 	    channels.clear();
+		Array<bool> recordStates;
 
 	    settings.numOutputs = 0;
 
@@ -82,11 +83,16 @@ void ChannelMappingNode::updateSettings()
 	        {
 				oldChannels[channelArray[i]]->mappedIndex = settings.numOutputs;
 	            channels.add(oldChannels[channelArray[i]]);
-				oldChannels.set(channelArray[i],nullptr,false);
+				recordStates.add(oldChannels[i]->getRecordState());
 	            settings.numOutputs++;
 	        }
 
 	    }
+		oldChannels.clearQuick(false);
+		for (int i = 0; i < settings.numOutputs; i++)
+		{
+			channels[i]->setRecordState(recordStates[i]);
+		}
 	}
 
 }
@@ -101,7 +107,7 @@ void ChannelMappingNode::setParameter(int parameterIndex, float newValue)
     }
     else if (parameterIndex == 2)
     {
-        referenceChannels.set((int) newValue, currentChannel);
+        referenceChannels.set((int) newValue, channelArray[currentChannel]);
     }
     else if (parameterIndex == 3)
     {

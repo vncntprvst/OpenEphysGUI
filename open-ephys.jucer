@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<JUCERPROJECT id="ynSYIrr" name="open-ephys" projectType="guiapp" version="0.3.4"
+<JUCERPROJECT id="ynSYIrr" name="open-ephys" projectType="guiapp" version="0.3.5"
               juceLinkage="amalg_multi" buildVST="1" buildRTAS="0" buildAU="1"
               pluginName="Juce Project" pluginDesc="Juce Project" pluginManufacturer="yourcompany"
               pluginManufacturerCode="Manu" pluginCode="Plug" pluginChannelConfigs="{1, 1}, {2, 2}"
@@ -289,6 +289,10 @@
               file="Source/Audio/AudioComponent.h"/>
       </GROUP>
       <GROUP id="yQmqZWk" name="Processors">
+        <GROUP id="{6E059BEC-4A8F-BCDA-1F91-9B22C6CBF2E4}" name="Rectifier">
+          <FILE id="oMFsRh" name="Rectifier.cpp" compile="1" resource="0" file="Source/Processors/Rectifier/Rectifier.cpp"/>
+          <FILE id="NdIO5Q" name="Rectifier.h" compile="0" resource="0" file="Source/Processors/Rectifier/Rectifier.h"/>
+        </GROUP>
         <GROUP id="{447899E6-3974-53D0-5588-79643E8F5CA3}" name="ArduinoOutput">
           <FILE id="Ucs5gf" name="ArduinoOutput.cpp" compile="1" resource="0"
                 file="Source/Processors/ArduinoOutput/ArduinoOutput.cpp"/>

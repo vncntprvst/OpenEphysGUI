@@ -25,7 +25,7 @@
 #define __GENERICPROCESSOR_H_1F469DAF__
 
 enum ChannelType {HEADSTAGE_CHANNEL = 0, AUX_CHANNEL = 1, ADC_CHANNEL = 2, EVENT_CHANNEL = 3,
-                  SINGLE_ELECTRODE = 4, STEREOTRODE = 5, TETRODE = 6, MESSAGE_CHANNEL = 7
+                  ELECTRODE_CHANNEL = 4,  MESSAGE_CHANNEL = 5 
                  };
 
 #include "../../../JuceLibraryCode/JuceHeader.h"
@@ -139,21 +139,6 @@ public:
         return GenericProcessor::unusedNameString;
     }
 
-    /** returns the names and types of all data, aux and adc channels */
-    virtual void getChannelsInfo(StringArray& Names, Array<ChannelType>& type, Array<int>& stream, Array<int>& originalChannelNumber, Array<float>& gains)
-    {
-
-    }
-
-    virtual int modifyChannelName(ChannelType t, int stream, int ch, String newName, bool updateSignalChain)
-    {
-        return -1;
-    }
-
-    virtual int modifyChannelGain(ChannelType t, int stream, int ch, float newGain, bool updateSignalChain)
-    {
-        return -1;
-    }
     virtual void getEventChannelNames(StringArray& Names)
     {
     }
@@ -384,11 +369,11 @@ public:
     /** Sets one of two possible source nodes for a splitter.*/
     virtual void setSplitterDestNode(GenericProcessor* dn) { }
 
-	/** Returns trus if a processor generates its own timestamps, false otherwise.*/
-	virtual bool generatesTimestamps()
-	{
-		return false;
-	}
+    /** Returns trus if a processor generates its own timestamps, false otherwise.*/
+    virtual bool generatesTimestamps()
+    {
+        return false;
+    }
 
     /** Returns true if a processor is a source, false otherwise.*/
     virtual bool isSource()
@@ -511,7 +496,7 @@ public:
                           uint8 eventChannel = 0,
                           uint8 numBytes = 0,
                           uint8* data = 0,
-						  bool isTimestamp = false);
+                          bool isTimestamp = false);
 
     /** Makes it easier for processors to respond to incoming events, such as TTLs and spikes.
 
@@ -525,12 +510,8 @@ public:
         PARAMETER_CHANGE = 2,
         TTL = 3,
         SPIKE = 4,
-        EEG = 5,
-        CONTINUOUS = 6,
-        NETWORK = 7,
-        EYE_POSITION = 8,
-        SERIAL = 9,
-        MESSAGE = 10
+        MESSAGE = 5,
+		BINARY_MSG = 6
     };
 
     /** Variable used to orchestrate saving the ProcessorGraph. */
@@ -666,7 +647,7 @@ private:
 
     /** Saves the record status of individual channels, even when other parameters are updated. */
     Array<bool> recordStatus;
-	Array<bool> monitorStatus;
+    Array<bool> monitorStatus;
 
     /** Extracts sample counts and timestamps from the MidiBuffer. */
     int processEventBuffer(MidiBuffer&);
@@ -675,7 +656,9 @@ private:
     static const String unusedNameString;
 
     bool paramsWereLoaded;
-	bool needsToSendTimestampMessage;
+    bool needsToSendTimestampMessage;
+
+	bool timestampSet;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(GenericProcessor);
 

@@ -105,11 +105,11 @@ LfpDisplayCanvas::LfpDisplayCanvas(LfpDisplayNode* processor_) :
     voltageRanges[AUX_CHANNEL].add("750");
     voltageRanges[AUX_CHANNEL].add("1000");
     voltageRanges[AUX_CHANNEL].add("2000");
-    voltageRanges[AUX_CHANNEL].add("5000");
-    selectedVoltageRange[AUX_CHANNEL] = 6;
-    rangeGain[AUX_CHANNEL] = 1; //uV
+    //voltageRanges[AUX_CHANNEL].add("5000");
+    selectedVoltageRange[AUX_CHANNEL] = 9;
+    rangeGain[AUX_CHANNEL] = 0.001; //mV
     rangeSteps[AUX_CHANNEL] = 10;
-    rangeUnits.add("uV");
+    rangeUnits.add("mV");
     typeNames.add("AUX");
 
     tbut = new UtilityButton("AUX",Font("Small Text", 9, Font::plain));
@@ -245,6 +245,10 @@ LfpDisplayCanvas::LfpDisplayCanvas(LfpDisplayNode* processor_) :
     lfpDisplay->setNumChannels(nChans);
     lfpDisplay->setRange(voltageRanges[HEADSTAGE_CHANNEL][selectedVoltageRange[HEADSTAGE_CHANNEL]-1].getFloatValue()*rangeGain[HEADSTAGE_CHANNEL]
         ,HEADSTAGE_CHANNEL);
+	lfpDisplay->setRange(voltageRanges[ADC_CHANNEL][selectedVoltageRange[ADC_CHANNEL] - 1].getFloatValue()*rangeGain[ADC_CHANNEL]
+		, ADC_CHANNEL);
+	lfpDisplay->setRange(voltageRanges[AUX_CHANNEL][selectedVoltageRange[AUX_CHANNEL] - 1].getFloatValue()*rangeGain[AUX_CHANNEL]
+		, AUX_CHANNEL);
 
     // add event display-specific controls (currently just an enable/disable button)
     for (int i = 0; i < 8; i++)
@@ -341,10 +345,15 @@ void LfpDisplayCanvas::update()
 
     for (int i = 0; i <= nChans; i++) // extra channel for events
     {
-        if (i < nChans)
-            sampleRate.add(processor->channels[i]->sampleRate);
-        else
-            sampleRate.add(processor->channels[i-1]->sampleRate); // for event channel (IT'S A HACK -- BE CAREFUL!)
+		if (processor->getNumInputs() > 0)
+		{
+			if (i < nChans)
+				sampleRate.add(processor->channels[i]->sampleRate);
+			else
+				sampleRate.add(processor->channels[i - 1]->sampleRate); // for event channel (IT'S A HACK -- BE CAREFUL!)
+		}
+		else
+			sampleRate.add(30000);
         
        // std::cout << "Sample rate for ch " << i << " = " << sampleRate[i] << std::endl; 
         displayBufferIndex.add(0);
@@ -1030,7 +1039,10 @@ void LfpDisplayCanvas::loadVisualizerParameters(XmlElement* xml)
 
 ChannelType LfpDisplayCanvas::getChannelType(int n)
 {
-    return processor->channels[n]->getType();
+	if (n < processor->getNumInputs())
+		return processor->channels[n]->getType();
+	else
+		return HEADSTAGE_CHANNEL;
 }
 
 ChannelType LfpDisplayCanvas::getSelectedType()
