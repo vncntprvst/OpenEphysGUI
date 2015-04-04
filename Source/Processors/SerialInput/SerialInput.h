@@ -34,7 +34,6 @@
 #include "SerialInputEditor.h"
 #include "../Serial/ofSerial.h"
 
-#include <windows.foundation.diagnostics.h>
 /**
 
  This source processor allows you to pipe binary serial data input straight to the event cue/buffer.
