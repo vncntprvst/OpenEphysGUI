@@ -27,8 +27,9 @@
 #include "SpikeSorterCanvas.h"
 #include "../Channel/Channel.h"
 #include "../SpikeDisplayNode/SpikeDisplayNode.h"
-#include "../Editors/PeriStimulusTimeHistogramEditor.h"
+#include "../PSTH/PeriStimulusTimeHistogramEditor.h"
 #include "../PSTH/PeriStimulusTimeHistogramNode.h"
+#include "../../AccessClass.h" //TO BE REMOVED
 class spikeSorter;
 
 SpikeSorter::SpikeSorter()
@@ -193,9 +194,9 @@ void SpikeSorter::updateSettings()
     {
 
         Channel* ch = new Channel(this,i,ELECTRODE_CHANNEL);
-		ch->name = generateSpikeElectrodeName(electrodes[i]->numChannels, ch->index);
-		SpikeChannel* spk = new SpikeChannel(SpikeChannel::Sorted, electrodes[i]->numChannels, electrodes[i], sizeof(Electrode));
-		ch->extraData = spk;
+        ch->name = generateSpikeElectrodeName(electrodes[i]->numChannels, ch->index);
+        SpikeChannel* spk = new SpikeChannel(SpikeChannel::Sorted, electrodes[i]->numChannels, electrodes[i], sizeof(Electrode));
+        ch->extraData = spk;
 
         eventChannels.add(ch);
     }
@@ -348,7 +349,7 @@ void SpikeSorter::removeAllUnits(int electrodeID)
 RHD2000Thread* SpikeSorter::getRhythmAccess()
 {
 
-    ProcessorGraph* gr = getProcessorGraph();
+    ProcessorGraph* gr = AccessClass::getProcessorGraph();
     Array<GenericProcessor*> p = gr->getListOfProcessors();
     for (int k=0; k<p.size(); k++)
     {
@@ -505,7 +506,7 @@ bool SpikeSorter::removeElectrode(int index)
     String eventlog = "RemoveElectrode " + String(electrodes[index]->electrodeID);
     //addNetworkEventToQueue(StringTS(eventlog));
 
-    int idToRemove = electrodes[index]->electrodeID;
+    //int idToRemove = electrodes[index]->electrodeID;
     electrodes.remove(index);
 
     //(idToRemove);
@@ -522,9 +523,11 @@ bool SpikeSorter::removeElectrode(int index)
 void SpikeSorter::setElectrodeName(int index, String newName)
 {
     mut.enter();
-    if ((electrodes.size() > 0) && (index > 0))
-        electrodes[index-1]->name = newName;
-    updateSinks(electrodes[index-1]->electrodeID, newName);
+	if ((electrodes.size() > 0) && (index > 0))
+	{
+		electrodes[index - 1]->name = newName;
+		updateSinks(electrodes[index - 1]->electrodeID, newName);
+	}
     mut.exit();
 }
 
@@ -1157,7 +1160,7 @@ void SpikeSorter::addProbes(String probeType,int numProbes, int nElectrodesPerPr
             bool successful = addElectrode(nChansPerElectrode, name,  depth);
             if (!successful)
             {
-                sendActionMessage("Not enough channels to add electrode.");
+                CoreServices::sendStatusMessage("Not enough channels to add electrode.");
                 return;
             }
         }
@@ -1215,7 +1218,7 @@ bool SpikeSorter::isSelectedElectrodeRecorded(int channel_index)
     if (electrodes.size() == 0)
         return false;
     int channel = electrodes[currentElectrode]->channels[channel_index];
-    RecordNode* recordNode = getProcessorGraph()->getRecordNode();
+    RecordNode* recordNode = AccessClass::getProcessorGraph()->getRecordNode();
 
     StringArray names;
     Array<bool> recording;
@@ -1295,7 +1298,7 @@ void SpikeSorter::loadCustomParametersFromXml()
 
             if (mainNode->hasTagName("SpikeSorter"))
             {
-                int numElectrodes = mainNode->getIntAttribute("numElectrodes");
+                //int numElectrodes = mainNode->getIntAttribute("numElectrodes");
                 currentElectrode = mainNode->getIntAttribute("activeElectrode");
                 numPreSamples = mainNode->getIntAttribute("numPreSamples");
                 numPostSamples = mainNode->getIntAttribute("numPostSamples");
@@ -1504,7 +1507,7 @@ Electrode* SpikeSorter::setCurrentElectrodeIndex(int i)
 void SpikeSorter::updateSinks(int electrodeID, int unitID, uint8 r, uint8 g, uint8 b, bool addRemove)
 {
     // inform sinks about a new unit
-    ProcessorGraph* gr = getProcessorGraph();
+    ProcessorGraph* gr = AccessClass::getProcessorGraph();
     Array<GenericProcessor*> p = gr->getListOfProcessors();
     for (int k = 0; k<p.size(); k++)
     {
@@ -1532,7 +1535,7 @@ void SpikeSorter::updateSinks(int electrodeID, int unitID, uint8 r, uint8 g, uin
 void SpikeSorter::updateSinks(int electrodeID, bool rem)
 {
     // inform sinks about a removal of all units
-    ProcessorGraph* g = getProcessorGraph();
+    ProcessorGraph* g = AccessClass::getProcessorGraph();
     Array<GenericProcessor*> p = g->getListOfProcessors();
     for (int k = 0; k<p.size(); k++)
     {
@@ -1561,7 +1564,7 @@ void SpikeSorter::updateSinks(int electrodeID, bool rem)
 void SpikeSorter::updateSinks(int electrodeID, int channelindex, int newchannel)
 {
     // inform sinks about a channel change
-    ProcessorGraph* g = getProcessorGraph();
+    ProcessorGraph* g = AccessClass::getProcessorGraph();
     Array<GenericProcessor*> p = g->getListOfProcessors();
     for (int k = 0; k<p.size(); k++)
     {
@@ -1581,7 +1584,7 @@ void SpikeSorter::updateSinks(int electrodeID, int channelindex, int newchannel)
 void SpikeSorter::updateSinks(Electrode* electrode)
 {
     // inform sinks about an electrode add
-    ProcessorGraph* g = getProcessorGraph();
+    ProcessorGraph* g = AccessClass::getProcessorGraph();
     Array<GenericProcessor*> p = g->getListOfProcessors();
     for (int k = 0; k<p.size(); k++)
     {
@@ -1603,7 +1606,7 @@ void SpikeSorter::updateSinks(Electrode* electrode)
 void SpikeSorter::updateSinks(int electrodeID, String NewName)
 {
     // inform sinks about an electrode name change
-    ProcessorGraph* g = getProcessorGraph();
+    ProcessorGraph* g = AccessClass::getProcessorGraph();
     Array<GenericProcessor*> p = g->getListOfProcessors();
     for (int k = 0; k < p.size(); k++)
     {
@@ -1626,7 +1629,7 @@ void SpikeSorter::updateSinks(int electrodeID, String NewName)
 void SpikeSorter::updateSinks(int electrodeID)
 {
     // inform sinks about an electrode removal
-    ProcessorGraph* g = getProcessorGraph();
+    ProcessorGraph* g = AccessClass::getProcessorGraph();
     Array<GenericProcessor*> p = g->getListOfProcessors();
     for (int k = 0; k<p.size(); k++)
     {
